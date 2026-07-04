@@ -448,8 +448,12 @@ create table if not exists pedidos_ecommerce (
   nome_produto text,
   valor numeric(12,2),
   status text not null default 'pendente',
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  lancamento_id uuid references lancamentos(id) on delete set null
 );
+
+alter table pedidos_ecommerce add column if not exists lancamento_id uuid references lancamentos(id) on delete set null;
+
 
 alter table pedidos_ecommerce enable row level security;
 grant select, insert, update, delete on pedidos_ecommerce to authenticated;

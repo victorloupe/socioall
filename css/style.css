@@ -750,6 +750,22 @@ h1, h2, h3, .h4, .h6 {
   color: var(--sa-danger);
 }
 
+.badge-status-pendente {
+  background-color: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+}
+
+.badge-status-faturado {
+  background-color: rgba(16, 185, 129, 0.12);
+  color: #059669;
+}
+
+.badge-status-cancelado {
+  background-color: rgba(220, 38, 38, 0.1);
+  color: var(--sa-danger);
+}
+
+
 /* ---------- Tables ---------- */
 
 .table-sa {

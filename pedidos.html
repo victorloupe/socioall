@@ -25,14 +25,30 @@
   <div id="sidebarMount"></div>
 
   <main class="main-content">
-      <h1 class="h4 mb-4">Pedidos</h1>
+      <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+        <h1 class="h4 mb-0">Pedidos</h1>
+        <button class="btn btn-primary d-flex align-items-center gap-2" onclick="abrirModalSincronizar()">
+          <i class="bi bi-arrow-repeat"></i> Sincronizar Pedidos
+        </button>
+      </div>
 
-      <div class="card-sa mb-3">
-        <div class="d-flex align-items-start gap-3">
-          <i class="bi bi-info-circle fs-4 text-muted"></i>
-          <div>
-            <strong>Integração com marketplaces em breve.</strong>
-            <p class="mb-0 text-muted small">Esta tela já está pronta para receber os pedidos das suas lojas automaticamente assim que a integração com cada marketplace for feita. Por enquanto não há nenhuma sincronização ativa.</p>
+      <!-- Barra de Filtros -->
+      <div class="card-sa mb-4">
+        <div class="row g-3">
+          <div class="col-md-6 col-lg-4">
+            <label for="filtroLoja" class="form-label small text-muted">Filtrar por Loja</label>
+            <select class="form-select form-select-sm" id="filtroLoja" onchange="filtrarPedidos()">
+              <option value="">Todas as lojas</option>
+            </select>
+          </div>
+          <div class="col-md-6 col-lg-4">
+            <label for="filtroStatus" class="form-label small text-muted">Filtrar por Status</label>
+            <select class="form-select form-select-sm" id="filtroStatus" onchange="filtrarPedidos()">
+              <option value="">Todos os status</option>
+              <option value="pendente">Pendente</option>
+              <option value="faturado">Faturado</option>
+              <option value="cancelado">Cancelado</option>
+            </select>
           </div>
         </div>
       </div>
@@ -41,7 +57,15 @@
         <div class="table-responsive">
           <table class="table table-sa">
             <thead>
-              <tr><th>Pedido</th><th>Produto</th><th>Loja</th><th>Valor</th><th>Status</th><th>Data</th></tr>
+              <tr>
+                <th>Pedido</th>
+                <th>Produto</th>
+                <th>Loja</th>
+                <th>Valor</th>
+                <th>Status</th>
+                <th>Data</th>
+                <th class="text-end text-nowrap">Ações</th>
+              </tr>
             </thead>
             <tbody id="pedidosTableBody"></tbody>
           </table>
@@ -49,6 +73,47 @@
       </div>
   </main>
 </div>
+
+<!-- Modal de Sincronização -->
+<div class="modal fade" id="sincronizarModal" tabindex="-1" aria-labelledby="sincronizarModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="sincronizarModalLabel">Sincronizar Pedidos</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <form id="sincronizarForm" onsubmit="iniciarSincronizacao(event)">
+          <div class="mb-3">
+            <label for="syncLojaSelect" class="form-label">Selecione a Loja</label>
+            <select class="form-select" id="syncLojaSelect" required>
+              <option value="">Carregando lojas...</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label for="syncToken" class="form-label">Token de API (Simulado)</label>
+            <input type="text" class="form-control" id="syncToken" placeholder="Insira qualquer chave para testar" required value="demo-token-123456">
+            <div class="form-text">Qualquer valor será aceito para fins de simulação de conexão.</div>
+          </div>
+          
+          <!-- Painel de progresso da sincronização -->
+          <div id="syncProgressPanel" class="d-none mt-4">
+            <div class="progress mb-2" style="height: 10px;">
+              <div id="syncProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+            </div>
+            <div id="syncProgressStatus" class="small text-muted text-center mb-0">Iniciando conexão...</div>
+          </div>
+          
+          <div class="modal-footer px-0 pb-0 mt-3">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" id="btnFecharSyncModal">Fechar</button>
+            <button type="submit" class="btn btn-primary" id="btnConfirmSync">Iniciar Sincronização</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
