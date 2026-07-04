@@ -1,0 +1,92 @@
+<button class="mobile-toggle-btn d-md-none" onclick="toggleMobileSidebar()" aria-label="Toggle menu" id="mobileToggleBtn">
+  <i class="bi bi-list" id="mobileToggleIcon"></i>
+</button>
+
+<div class="mobile-overlay d-md-none" id="mobileOverlay" onclick="toggleMobileSidebar()"></div>
+
+<aside class="sidebar-col" id="sidebarCol">
+  <!-- Header -->
+  <div class="sidebar-header">
+    <button type="button" class="brand-wrapper" onclick="toggleSidebar()" title="Recolher/expandir menu" aria-label="Recolher/expandir menu">
+      <div class="brand-logo" id="sidebarBrandLogo">
+        <img src="logo-icon.png" alt="SócioAll" class="brand-icon">
+      </div>
+      <div class="brand-text">
+        <span class="brand-name" id="sidebarBrandName">SócioAll</span>
+        <span class="brand-subtext">Gestão Compartilhada</span>
+      </div>
+    </button>
+  </div>
+
+  <!-- Search Bar -->
+  <div class="sidebar-search" onclick="expandSidebarAndFocusSearch()">
+    <div class="search-input-wrapper">
+      <i class="bi bi-search search-icon"></i>
+      <label for="sidebarSearchInput" class="visually-hidden">Buscar no menu</label>
+      <input type="text" placeholder="Buscar no menu..." id="sidebarSearchInput" oninput="filterSidebarMenu()">
+    </div>
+  </div>
+
+  <!-- Navigation -->
+  <ul class="nav flex-column sidebar-nav" id="sidebarNav">
+    <li class="nav-item">
+      <a class="nav-link" href="dashboard.html" title="Dashboard" data-page="dashboard">
+        <i class="bi bi-speedometer2"></i>
+        <span class="nav-label">Dashboard</span>
+      </a>
+    </li>
+
+    <li class="nav-section-title">Vendas</li>
+    <li class="nav-item">
+      <a class="nav-link" href="pedidos.html" title="Pedidos" data-page="pedidos">
+        <i class="bi bi-bag-check"></i>
+        <span class="nav-label">Pedidos</span>
+      </a>
+    </li>
+
+    <li class="nav-section-title">Caixa</li>
+    <li class="nav-item">
+      <a class="nav-link" href="precificacao.html" title="Calculadora de Preços" data-page="precificacao">
+        <i class="bi bi-calculator"></i>
+        <span class="nav-label">Calculadora de Preços</span>
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" href="lancamentos.html" title="Lançamentos" data-page="lancamentos">
+        <i class="bi bi-arrow-left-right"></i>
+        <span class="nav-label">Lançamentos</span>
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" href="categorias.html" title="Categorias" data-page="categorias">
+        <i class="bi bi-tags"></i>
+        <span class="nav-label">Categorias</span>
+      </a>
+    </li>
+
+    <li class="nav-item">
+      <a class="nav-link" href="relatorios.html" title="Relatórios" data-page="relatorios">
+        <i class="bi bi-bar-chart-line"></i>
+        <span class="nav-label">Relatórios</span>
+      </a>
+    </li>
+
+    <li class="nav-section-title">Configuração</li>
+    <li class="nav-item">
+      <a class="nav-link" href="empresa.html" title="Configurações" data-page="empresa">
+        <i class="bi bi-gear"></i>
+        <span class="nav-label">Configurações</span>
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" href="socios.html" title="Sócios" data-page="socios">
+        <i class="bi bi-people"></i>
+        <span class="nav-label">Sócios</span>
+      </a>
+    </li>
+  </ul>
+
+  <!-- Footer -->
+  <div class="sidebar-footer">
+    <div class="sidebar-profile">
+      <div class="pro

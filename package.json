@@ -1,0 +1,9 @@
+{
+  "name": "socioall",
+  "private": true,
+  "version": "1.0.0",
+  "description": "SócioAll — site estático (Bootstrap + Supabase) com uma função serverless para reset de senha entre sócios.",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0"
+  }
+}

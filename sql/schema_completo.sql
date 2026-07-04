@@ -1,0 +1,354 @@
+-- SócioAll — schema completo (consolida schema.sql + update_v2 a update_v5)
+--
+-- Este arquivo substitui a necessidade de rodar 5 scripts em sequência.
+-- É seguro rodar tanto num projeto Supabase novo (do zero) quanto num projeto
+-- que já tem parte do schema antigo aplicado — todo comando usa "if not exists"
+-- ou "drop ... if exists" antes de recriar, então rodar de novo não quebra nada.
+--
+-- PASSO A PASSO:
+--   1) Cole este arquivo inteiro no SQL Editor do Supabase e rode.
+--   2) Vá em Storage (menu lateral do painel) e crie manualmente 2 buckets:
+--        - "logos"        → marque como PÚBLICO
+--        - "comprovantes" → deixe PRIVADO (não marque público)
+--      Importante: crie os buckets pela tela do Storage, não por SQL. Criar
+--      bucket via "insert into storage.buckets" pode deixá-lo com metadados
+--      incompletos e causar erros como "the database schema is invalid or
+--      incompatible" ao tentar fazer upload — a tela do Storage inicializa o
+--      bucket corretamente nos bastidores.
+--   3) Em Authentication > Providers > Email, desative "Confirm email".
+--
+-- Depois disso o app está 100% funcional: lançamentos, sócios, categorias,
+-- relatórios, comprovantes, dados da empresa (com logo) e reset de senha entre
+-- sócios (esse último também precisa da SUPABASE_SERVICE_ROLE_KEY na Vercel —
+-- veja o README).
+
+create extension if not exists "uuid-ossp";
+
+-- ============================================================
+-- TABELAS
+-- ============================================================
+
+create table if not exists empresas (
+  id uuid primary key default uuid_generate_v4(),
+  nome text not null,
+  created_by uuid references auth.users(id) not null,
+  created_at timestamptz default now(),
+  site text,
+  endereco text,
+  logo_url text,
+  cnpj text,
+  telefone text,
+  email_contato text
+);
+
+-- Garante as colunas mesmo se a tabela já existia de uma instalação antiga.
+alter table empresas add column if not exists site text;
+alter table empresas add column if not exists endereco text;
+alter table empresas add column if not exists logo_url text;
+alter table empresas add column if not exists cnpj text;
+alter table empresas add column if not exists telefone text;
+alter table empresas add column if not exists email_contato text;
+
+create table if not exists socios (
+  id uuid primary key default uuid_generate_v4(),
+  empresa_id uuid references empresas(id) on delete cascade not null,
+  user_id uuid references auth.users(id),
+  nome text not null,
+  email text,
+  percentual numeric(5,2) not null default 0 check (percentual >= 0 and percentual <= 100),
+  created_at timestamptz default now()
+);
+
+create table if not exists categorias (
+  id uuid primary key default uuid_generate_v4(),
+  empresa_id uuid references empresas(id) on delete cascade not null,
+  nome text not null,
+  tipo text not null check (tipo in ('receita', 'despesa')),
+  created_at timestamptz default now()
+);
+
+create table if not exists lancamentos (
+  id uuid primary key default uuid_generate_v4(),
+  empresa_id uuid references empresas(id) on delete cascade not null,
+  categoria_id uuid references categorias(id) on delete set null,
+  socio_id uuid references socios(id) on delete set null,
+  tipo text not null check (tipo in ('receita', 'despesa')),
+  descricao text not null,
+  valor numeric(12,2) not null check (valor > 0),
+  data date not null default current_date,
+  created_at timestamptz default now(),
+  comprovante_path text
+);
+
+alter table lancamentos add column if not exists comprovante_path text;
+
+-- Corrige a FK para ON DELETE SET NULL mesmo se a tabela já existia sem isso
+-- (senão excluir uma categoria/sócio com lançamento vinculado falha).
+alter table lancamentos drop constraint if exists lancamentos_categoria_id_fkey;
+alter table lancamentos add constraint lancamentos_categoria_id_fkey
+  foreign key (categoria_id) references categorias(id) on delete set null;
+
+alter table lancamentos drop constraint if exists lancamentos_socio_id_fkey;
+alter table lancamentos add constraint lancamentos_socio_id_fkey
+  foreign key (socio_id) references socios(id) on delete set null;
+
+-- Índices úteis
+create index if not exists idx_socios_empresa on socios(empresa_id);
+create index if not exists idx_lancamentos_empresa on lancamentos(empresa_id);
+create index if not exists idx_lancamentos_data on lancamentos(data);
+
+-- Categoria duplicada (mesmo nome + tipo, na mesma empresa) não é permitida.
+create unique index if not exists categorias_unique_nome_tipo
+  on categorias (empresa_id, lower(nome), tipo);
+
+-- ============================================================
+-- FUNÇÃO AUXILIAR DE RLS
+-- ============================================================
+
+-- Evita recursão infinita (loop de RLS no Postgres) ao consultar a tabela "socios".
+-- Definida com SECURITY DEFINER para rodar com privilégios de bypass de RLS.
+create or replace function get_user_empresas(v_user_id uuid)
+returns table(empresa_id uuid)
+language plpgsql
+security definer
+stable
+set search_path = public
+as $$
+begin
+  return query
+  select s.empresa_id from socios s where s.user_id = v_user_id;
+end;
+$$;
+
+grant execute on function get_user_empresas(uuid) to authenticated;
+
+-- ============================================================
+-- ROW LEVEL SECURITY
+-- ============================================================
+
+alter table empresas enable row level security;
+alter table socios enable row level security;
+alter table categorias enable row level security;
+alter table lancamentos enable row level security;
+
+drop policy if exists "empresas_select" on empresas;
+create policy "empresas_select" on empresas for select
+  using (id in (select * from get_user_empresas(auth.uid())) or created_by = auth.uid());
+
+drop policy if exists "empresas_insert" on empresas;
+create policy "empresas_insert" on empresas for insert
+  with check (created_by = auth.uid());
+
+-- Faltava no schema original: sem isso, ninguém conseguia editar os dados da empresa.
+drop policy if exists "empresas_update" on empresas;
+create policy "empresas_update" on empresas for update
+  using (id in (select * from get_user_empresas(auth.uid())) or created_by = auth.uid());
+
+drop policy if exists "socios_select" on socios;
+create policy "socios_select" on socios for select
+  using (empresa_id in (select * from get_user_empresas(auth.uid())));
+
+drop policy if exists "socios_insert" on socios;
+create policy "socios_insert" on socios for insert
+  with check (empresa_id in (select id from empresas where created_by = auth.uid())
+              or empresa_id in (select * from get_user_empresas(auth.uid())));
+
+drop policy if exists "socios_update" on socios;
+create policy "socios_update" on socios for update
+  using (empresa_id in (select * from get_user_empresas(auth.uid())));
+
+-- Um sócio não pode excluir a si mesmo (trava no banco, não só na interface).
+drop policy if exists "socios_delete" on socios;
+create policy "socios_delete" on socios for delete
+  using (
+    empresa_id in (select * from get_user_empresas(auth.uid()))
+    and user_id is distinct from auth.uid()
+  );
+
+drop policy if exists "categorias_all" on categorias;
+create policy "categorias_all" on categorias for all
+  using (empresa_id in (select * from get_user_empresas(auth.uid())));
+
+drop policy if exists "lancamentos_all" on lancamentos;
+create policy "lancamentos_all" on lancamentos for all
+  using (empresa_id in (select * from get_user_empresas(auth.uid())));
+
+-- ============================================================
+-- FUNÇÕES
+-- ============================================================
+
+-- Vincula automaticamente um sócio "convidado" (cadastrado só com nome+e-mail,
+-- sem user_id) à conta certa assim que essa pessoa cria login com o mesmo e-mail.
+create or replace function claim_socio_invite()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_email text;
+begin
+  select email into v_email from auth.users where id = auth.uid();
+  if v_email is null then
+    return;
+  end if;
+
+  update socios
+  set user_id = auth.uid()
+  where user_id is null
+    and lower(email) = lower(v_email);
+end;
+$$;
+
+grant execute on function claim_socio_invite() to authenticated;
+
+-- Bloqueia a soma dos percentuais dos sócios de uma empresa passar de 100%.
+create or replace function check_percentual_socios()
+returns trigger
+language plpgsql
+as $$
+declare
+  v_total numeric;
+begin
+  select coalesce(sum(percentual), 0) into v_total
+  from socios
+  where empresa_id = new.empresa_id
+    and id <> new.id;
+
+  v_total := v_total + new.percentual;
+
+  if v_total > 100.01 then
+    raise exception 'A soma dos percentuais dos sócios não pode passar de 100%% (ficaria em %).', round(v_total, 1);
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_check_percentual_socios on socios;
+create trigger trg_check_percentual_socios
+  before insert or update of percentual, empresa_id on socios
+  for each row execute function check_percentual_socios();
+
+-- Impede que o campo user_id/email de um sócio JÁ VINCULADO a um login seja
+-- alterado por outro sócio da empresa (ex: via chamada direta à API REST do
+-- Supabase). Antes disso, a policy "socios_update" só validava empresa_id,
+-- então qualquer sócio podia reatribuir o login de outro sócio.
+create or replace function protect_socio_vinculo()
+returns trigger
+language plpgsql
+as $$
+begin
+  if old.user_id is not null and (
+    new.user_id is distinct from old.user_id
+    or new.email is distinct from old.email
+  ) then
+    raise exception 'Não é possível alterar o usuário/e-mail de um sócio que já possui login.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_protect_socio_vinculo on socios;
+create trigger trg_protect_socio_vinculo
+  before update of user_id, email on socios
+  for each row execute function protect_socio_vinculo();
+
+-- Impede que created_by da empresa seja reatribuído via update direto
+-- (a policy "empresas_update" só validava que o autor pertence à empresa,
+-- não impedia trocar quem é o "created_by").
+create or replace function protect_empresa_created_by()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.created_by is distinct from old.created_by then
+    raise exception 'Não é possível alterar o criador da empresa.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_protect_empresa_created_by on empresas;
+create trigger trg_protect_empresa_created_by
+  before update of created_by on empresas
+  for each row execute function protect_empresa_created_by();
+
+-- ============================================================
+-- LOG DE AUDITORIA + RATE LIMIT DO RESET DE SENHA ENTRE SÓCIOS
+-- ============================================================
+-- Usada pela função serverless api/reset-senha-socio.js (via service role,
+-- que ignora RLS) para registrar quem resetou a senha de quem, e para
+-- impedir que um sócio fique resetando a senha de outro repetidamente.
+
+create table if not exists reset_senha_logs (
+  id uuid primary key default uuid_generate_v4(),
+  empresa_id uuid references empresas(id) on delete cascade,
+  caller_user_id uuid references auth.users(id),
+  caller_socio_id uuid references socios(id) on delete set null,
+  target_socio_id uuid references socios(id) on delete set null,
+  created_at timestamptz default now()
+);
+
+alter table reset_senha_logs enable row level security;
+
+-- Sócios da empresa podem ver o histórico de resets (transparência); só a
+-- service role (backend) pode inserir, então não há policy de insert aqui.
+drop policy if exists "reset_senha_logs_select" on reset_senha_logs;
+create policy "reset_senha_logs_select" on reset_senha_logs for select
+  using (empresa_id in (select * from get_user_empresas(auth.uid())));
+
+create index if not exists idx_reset_senha_logs_caller
+  on reset_senha_logs(caller_user_id, created_at);
+
+-- ============================================================
+-- STORAGE (policies) — crie os buckets "logos" e "comprovantes" pelo painel
+-- (Storage > New bucket) ANTES ou DEPOIS de rodar isso; as policies abaixo só
+-- fazem referência ao nome do bucket, não dependem da ordem.
+-- ============================================================
+
+drop policy if exists "comprovantes_select" on storage.objects;
+create policy "comprovantes_select" on storage.objects for select
+  using (
+    bucket_id = 'comprovantes'
+    and (storage.foldername(name))[1]::uuid in (select * from get_user_empresas(auth.uid()))
+  );
+
+drop policy if exists "comprovantes_insert" on storage.objects;
+create policy "comprovantes_insert" on storage.objects for insert
+  with check (
+    bucket_id = 'comprovantes'
+    and (storage.foldername(name))[1]::uuid in (select * from get_user_empresas(auth.uid()))
+  );
+
+drop policy if exists "comprovantes_delete" on storage.objects;
+create policy "comprovantes_delete" on storage.objects for delete
+  using (
+    bucket_id = 'comprovantes'
+    and (storage.foldername(name))[1]::uuid in (select * from get_user_empresas(auth.uid()))
+  );
+
+drop policy if exists "logos_select" on storage.objects;
+create policy "logos_select" on storage.objects for select
+  using (bucket_id = 'logos');
+
+drop policy if exists "logos_insert" on storage.objects;
+create policy "logos_insert" on storage.objects for insert
+  with check (
+    bucket_id = 'logos'
+    and (storage.foldername(name))[1]::uuid in (select * from get_user_empresas(auth.uid()))
+  );
+
+drop policy if exists "logos_update" on storage.objects;
+create policy "logos_update" on storage.objects for update
+  using (
+    bucket_id = 'logos'
+    and (storage.foldername(name))[1]::uuid in (select * from get_user_empresas(auth.uid()))
+  );
+
+drop policy if exists "logos_delete" on storage.objects;
+create policy "logos_delete" on storage.objects for delete
+  using (
+    bucket_id = 'logos'
+    and (storage.foldername(name))[1]::uuid in (select * from get_user_empresas(auth.uid()))
+  );

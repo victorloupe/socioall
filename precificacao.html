@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SócioAll — Calculadora de Preços</title>
+<script>if (localStorage.getItem("sa_sidebar_collapsed") === "1") document.documentElement.classList.add("sa-sidebar-collapsed");</script>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<link rel="icon" type="image/png" href="logo-icon.png">
+<link href="css/style.css" rel="stylesheet">
+</head>
+<body>
+
+<button class="mobile-toggle-btn d-md-none" onclick="toggleMobileSidebar()" aria-label="Toggle menu" id="mobileToggleBtn">
+  <i class="bi bi-list" id="mobileToggleIcon"></i>
+</button>
+
+<div class="mobile-overlay d-md-none" id="mobileOverlay" onclick="toggleMobileSidebar()"></div>
+
+<div class="app-shell">
+  <div id="sidebarMount"></div>
+
+  <main class="main-content">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h4 mb-0">Calculadora de Preços</h1>
+        <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#lojasModal">
+          <i class="bi bi-shop me-1"></i>Gerenciar lojas
+        </button>
+      </div>
+
+      <div class="row g-3 align-items-stretch">
+        <div class="col-12 col-lg-6 d-flex">
+          <div class="card-sa flex-fill">
+            <h2 class="h6 mb-2">Calcular preço de venda</h2>
+
+            <form id="calculadoraForm">
+              <div class="mb-2">
+                <label class="form-label small" for="calcNomeProduto">Nome do produto</label>
+                <input type="text" class="form-control form-control-sm" id="calcNomeProduto" required>
+              </div>
+
+              <div class="row g-2 mb-2">
+                <div class="col-12 col-sm-6">
+                  <label class="form-label small" for="calcLinkVenda">Link de venda</label>
+                  <input type="url" class="form-control form-control-sm" id="calcLinkVenda" placeholder="Seu anúncio (opcional)">
+                </div>
+                <div class="col-12 col-sm-6">
+                  <label class="form-label small" for="calcLinkReferencia">Link de referência</label>
+                  <input type="url" class="form-control form-control-sm" id="calcLinkReferencia" placeholder="Base de comparação (opcional)">
+                </div>
+              </div>
+
+              <div class="mb-2">
+                <label class="form-label small mb-1" id="lojaTabsLabel">Loja / marketplace</label>
+                <ul class="nav nav-tabs flex-wrap" id="lojaTabs" role="tablist" aria-labelledby="lojaTabsLabel"></ul>
+                <input type="hidden" id="calcLojaId" value="">
+              </div>
+
+              <div class="row g-2 mb-2">
+                <div class="col-6 col-sm-4">
+                  <label class="form-label small" for="calcCustoProduto">Custo do produto (R$)</label>
+                  <input type="number" step="0.01" min="0" class="form-control form-control-sm" id="calcCustoProduto" value="0" required>
+                </div>
+                <div class="col-6 col-sm-4">
+                  <label class="form-label small" for="calcCustoEmbalagem">Embalagem (R$)</label>
+                  <input type="number" step="0.01" min="0" class="form-control form-control-sm" id="calcCustoEmbalagem" value="1.00" required>
+                </div>
+                <div class="col-12 col-sm-4">
+                  <label class="form-label small" for="calcCustoOperacional">Custo operacional (R$)</label>
+                  <input type="number" step="0.01" min="0" class="form-control form-control-sm" id="calcCustoOperacional" value="0" required>
+                </div>
+              </div>
+
+              <div class="row g-2 mb-3">
+                <div class="col-12 col-sm-4">
+                  <label class="form-label small" for="calcLucro">Lucro desejado</label>
+                  <div class="input-group">
+                    <input type="number" step="0.01" min="0" class="form-control" id="calcLucro" value="0" required>
+                    <select class="form-select sa-lucro-tipo-select" id="calcLucroTipo" aria-label="Tipo do lucro: reais ou percentual">
+                      <option value="valor" selected>R$</option>
+                      <option value="percentual">%</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="col-6 col-sm-4">
+                  <label class="form-label small" for="calcTaxaPercentual">Taxa da loja (%)</label>
+                  <input type="number" step="0.01" min="0" max="99.99" class="form-control form-control-sm" id="calcTaxaPercentual" value="0">
+                </div>
+                <div class="col-6 col-sm-4">
+                  <label class="form-label small" for="calcTaxaFixa">Taxa fixa da loja (R$)</label>
+                  <input type="number" step="0.01" min="0" class="form-control form-control-sm" id="calcTaxaFixa" value="0">
+                </div>
+              </div>
+
+              <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary btn-sm flex-fill">
+                  <i class="bi bi-calculator me-1"></i>Calcular
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="salvarCalculoBtn" disabled>
+                  <i class="bi bi-save me-1"></i>Salvar no histórico
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div class="col-12 col-lg-6 d-flex" id="resultadoCard">
+          <div class="card-sa flex-fill">
+            <h2 class="h6 mb-2">Resultado</h2>
+            <table class="table table-sa table-resultado mb-0">
+              <tbody>
+                <tr>
+                  <td class="fw-semibold">Preço de venda sugerido</td>
+                  <td class="text-end fw-bold sa-preco-destaque" id="resPrecoVenda">—</td>
+                </tr>
+                <tr><td>Custo do produto</td><td class="text-end" id="resCustoProduto">—</td></tr>
+                <tr><td>Embalagem</td><td class="text-end" id="resEmbalagem">—</td></tr>
+                <tr><td>Custo operacional</td><td class="text-end" id="resOperacional">—</td></tr>
+                <tr><td>Lucro desejado</td><td class="text-end" id="resLucro">—</td></tr>
+                <tr><td>Taxa fixa da loja</td><td class="text-end" id="resTaxaFixa">—</td></tr>
+                <tr><td>Taxa percentual da loja (sobre o preço de venda)</td><td class="text-end" id="resTaxaPercentual">—</td></tr>
+                <tr class="fw-semibold"><td>Valor líquido que você recebe (conferência)</td><td class="text-end" id="resLiquido">—</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-sa mt-4">
+        <h2 class="h6 mb-3">Histórico de cálculos salvos</h2>
+        <div class="table-responsive table-list-min">
+          <table class="table table-sa">
+            <thead>
+              <tr><th>Produto</th><th>Loja</th><th>Preço de venda</th><th>Data</th><th></th></tr>
+            </thead>
+            <tbody id="historicoTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+  </main>
+</div>
+
+<!-- Modal de gerenciamento de lojas -->
+<div class="modal fade" id="lojasModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="h6 modal-title">Lojas / marketplaces</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small">Taxas de comissão pesquisadas como ponto de partida — os marketplaces mudam a política com frequência, então confira e ajuste sempre que precisar.</p>
+        <div class="table-responsive mb-4">
+          <table class="table table-sa table-sm">
+            <thead><tr><th>Nome</th><th>Taxa %</th><th>Taxa fixa (R$)</th><th>Observações</th><th>Atualizado em</th><th></th></tr></thead>
+            <tbody id="lojasTableBody"></tbody>
+          </table>
+        </div>
+
+        <h3 class="h6 mb-3" id="lojaFormTitulo">Adicionar loja</h3>
+        <form id="novaLojaForm">
+          <input type="hidden" id="lojaEditId" value="">
+          <div class="row g-2">
+            <div class="col-12 col-sm-4">
+              <label class="form-label small" for="lojaNome">Nome</label>
+              <input type="text" class="form-control" id="lojaNome" required>
+            </div>
+            <div class="col-6 col-sm-2">
+              <label class="form-label small" for="lojaTaxaPercentual">Taxa %</label>
+              <input type="number" step="0.01" min="0" max="99.99" class="form-control" id="lojaTaxaPercentual" value="0" required>
+            </div>
+            <div class="col-6 col-sm-2">
+              <label class="form-label small" for="lojaTaxaFixa">Taxa fixa (R$)</label>
+              <input type="number" step="0.01" min="0" class="form-control" id="lojaTaxaFixa" value="0" required>
+            </div>
+            <div class="col-12 col-sm-4">
+              <label class="form-label small" for="lojaLinkReferencia">Link de referência (opcional)</label>
+              <input type="url" class="form-control" id="lojaLinkReferencia" placeholder="Página de taxas da loja">
+            </div>
+            <div class="col-12">
+              <label class="form-label small" for="lojaObservacoes">Observações (opcional)</label>
+              <input type="text" class="form-control" id="lojaObservacoes" placeholder="Ex: taxa varia por categoria/faixa de preço">
+            </div>
+          </div>
+          <div class="d-flex gap-2 mt-3">
+            <button type="submit" class="btn btn-primary" id="lojaSubmitBtn">
+              <i class="bi bi-plus-lg me-1"></i>Adicionar loja
+            </button>
+            <button type="button" class="btn btn-outline-secondary d-none" id="lojaCancelEditBtn">Cancelar edição</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal com o resultado de um cálculo salvo no histórico -->
+<div class="modal fade" id="verCalculoModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="h6 modal-title" id="verCalculoTitulo">Cálculo</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <table class="table table-sa table-sm mb-0">
+          <tbody>
+            <tr>
+              <td class="fw-semibold">Preço de venda sugerido</td>
+              <td class="text-end fw-bold sa-preco-destaque-sm" id="verPrecoVenda">—</td>
+            </tr>
+            <tr><td>Loja</td><td class="text-end" id="verLoja">—</td></tr>
+            <tr><td>Custo do produto</td><td class="text-end" id="verCustoProduto">—</td></tr>
+            <tr><td>Embalagem</td><td class="text-end" id="verEmbalagem">—</td></tr>
+            <tr><td>Custo operacional</td><td class="text-end" id="verOperacional">—</td></tr>
+            <tr><td>Lucro desejado</td><td class="text-end" id="verLucro">—</td></tr>
+            <tr><td>Taxa fixa da loja</td><td class="text-end" id="verTaxaFixa">—</td></tr>
+            <tr><td>Taxa percentual da loja</td><td class="text-end" id="verTaxaPercentual">—</td></tr>
+          </tbody>
+        </table>
+        <div class="mt-3 d-flex gap-2 flex-wrap" id="verLinksWrapper"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdeliv
