@@ -134,19 +134,44 @@ async function loadLancamentos() {
   lancamentos.forEach(l => {
     const badgeClass = l.tipo === "receita" ? "badge-receita" : "badge-despesa";
     const sinal = l.tipo === "receita" ? "+" : "-";
+    const valorClass = l.tipo === "receita" ? "value-positive" : "value-negative";
+    const nomeSocio = escapeHtml(l.socios?.nome || "—");
+    const comprovanteBtn = l.lancamento_comprovantes?.length
+      ? `<button class="btn btn-sm btn-outline-secondary" title="Ver comprovantes" aria-label="Ver comprovantes" onclick="verComprovantes('${l.id}')"><i class="bi bi-paperclip"></i>${l.lancamento_comprovantes.length > 1 ? ` ${l.lancamento_comprovantes.length}` : ""}</button>`
+      : "";
+    const editarBtn = `<button class="btn btn-sm btn-outline-secondary" aria-label="Editar lançamento" onclick="editarLancamento('${l.id}')"><i class="bi bi-pencil"></i></button>`;
+    const excluirBtn = `<button class="btn btn-sm btn-outline-danger" aria-label="Excluir lançamento" onclick="excluirLancamento('${l.id}')"><i class="bi bi-trash"></i></button>`;
+
     const tr = document.createElement("tr");
+    // Duas versões da mesma linha: as 7 colunas de sempre (só aparecem a
+    // partir de md, d-md-table-cell) e um cartão de 2 linhas só pro mobile
+    // (d-md-none) — evita empurrar 7 colunas espremidas numa tela estreita.
     tr.innerHTML = `
-      <td>${formatDate(l.data)}</td>
-      <td>${escapeHtml(l.descricao)}</td>
-      <td><span class="badge ${badgeClass}">${l.tipo}</span></td>
-      <td>${escapeHtml(l.socios?.nome || "—")}</td>
-      <td class="${l.tipo === 'receita' ? 'value-positive' : 'value-negative'}">${sinal} ${formatCurrency(l.valor)}</td>
-      <td class="text-center">
-        ${l.lancamento_comprovantes?.length ? `<button class="btn btn-sm btn-outline-secondary" title="Ver comprovantes" aria-label="Ver comprovantes" onclick="verComprovantes('${l.id}')"><i class="bi bi-paperclip"></i>${l.lancamento_comprovantes.length > 1 ? ` ${l.lancamento_comprovantes.length}` : ""}</button>` : ""}
-      </td>
-      <td class="text-end text-nowrap">
-        <button class="btn btn-sm btn-outline-secondary" aria-label="Editar lançamento" onclick="editarLancamento('${l.id}')"><i class="bi bi-pencil"></i></button>
-        <button class="btn btn-sm btn-outline-danger" aria-label="Excluir lançamento" onclick="excluirLancamento('${l.id}')"><i class="bi bi-trash"></i></button>
+      <td class="d-none d-md-table-cell">${formatDate(l.data)}</td>
+      <td class="d-none d-md-table-cell">${escapeHtml(l.descricao)}</td>
+      <td class="d-none d-md-table-cell"><span class="badge ${badgeClass}">${l.tipo}</span></td>
+      <td class="d-none d-md-table-cell">${nomeSocio}</td>
+      <td class="d-none d-md-table-cell ${valorClass}">${sinal} ${formatCurrency(l.valor)}</td>
+      <td class="d-none d-md-table-cell text-center">${comprovanteBtn}</td>
+      <td class="d-none d-md-table-cell text-end text-nowrap">${editarBtn}${excluirBtn}</td>
+
+      <td class="d-md-none lanc-mobile-card" colspan="7">
+        <div class="lanc-line-1">
+          <span class="lanc-descricao">${escapeHtml(l.descricao)}</span>
+          <span class="lanc-valor ${valorClass}">${sinal} ${formatCurrency(l.valor)}</span>
+        </div>
+        <div class="lanc-line-2">
+          <div class="lanc-meta">
+            <span class="badge ${badgeClass}">${l.tipo}</span>
+            <span class="lanc-meta-sep">·</span>
+            <span>${nomeSocio}</span>
+            <span class="lanc-meta-sep">·</span>
+            <span>${formatDate(l.data)}</span>
+          </div>
+          <div class="lanc-actions">
+            ${comprovanteBtn}${editarBtn}${excluirBtn}
+          </div>
+        </div>
       </td>
     `;
     tbody.appendChild(tr);

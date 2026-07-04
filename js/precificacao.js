@@ -121,7 +121,7 @@ function renderLojasTable() {
   tbody.innerHTML = "";
 
   if (lojasCache.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" class="table-empty">Nenhuma loja cadastrada ainda.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="table-empty">Nenhuma loja cadastrada ainda.</td></tr>';
     return;
   }
 
@@ -137,16 +137,19 @@ function renderLojasTable() {
     const desatualizada = dias !== null && dias > DIAS_PARA_REVISAR;
     const atualizadoTexto = atualizadoEm ? formatDate(atualizadoEm.slice(0, 10)) : "—";
 
+    // data-label alimenta o rótulo de cada campo quando a tabela vira "cards"
+    // empilhados no mobile (.table-stack-mobile, ver css/style.css) — no
+    // desktop esses atributos não fazem nada, a tabela renderiza normal.
     tr.innerHTML = `
-      <td>${escapeHtml(l.nome)}</td>
-      <td>${Number(l.taxa_percentual).toFixed(2)}%</td>
-      <td>${formatCurrency(l.taxa_fixa)}</td>
-      <td class="small text-muted">${escapeHtml(l.observacoes || "—")}</td>
-      <td class="small ${desatualizada ? "text-danger" : "text-muted"}">
+      <td data-label="Nome">${escapeHtml(l.nome)}</td>
+      <td data-label="Taxa %">${Number(l.taxa_percentual).toFixed(2)}%</td>
+      <td data-label="Taxa fixa (R$)">${formatCurrency(l.taxa_fixa)}</td>
+      <td class="small text-muted td-stack-full" data-label="Observações">${escapeHtml(l.observacoes || "—")}</td>
+      <td class="small ${desatualizada ? "text-danger" : "text-muted"}" data-label="Atualizado em">
         ${atualizadoTexto}
         ${desatualizada ? '<br><i class="bi bi-exclamation-triangle-fill"></i> revisar taxa' : ""}
       </td>
-      <td class="text-end text-nowrap">
+      <td class="text-end text-nowrap" data-label="Ações">
         <button type="button" class="btn btn-sm btn-outline-secondary" aria-label="Editar loja ${escapeHtml(l.nome)}" onclick="editarLoja('${l.id}')"><i class="bi bi-pencil"></i></button>
         <button type="button" class="btn btn-sm btn-outline-danger" aria-label="Excluir loja ${escapeHtml(l.nome)}" onclick="excluirLoja('${l.id}')"><i class="bi bi-trash"></i></button>
       </td>

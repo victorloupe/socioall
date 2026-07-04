@@ -54,48 +54,6 @@ h1, h2, h3, .h4, .h6 {
   font-size: 1.2rem;
 }
 
-/* ---------- Mobile Toggle Controls ---------- */
-
-.mobile-toggle-btn {
-  position: fixed;
-  top: 16px;
-  left: 16px;
-  z-index: 1050;
-  width: 42px;
-  height: 42px;
-  border: 1px solid var(--sa-border);
-  background-color: var(--sa-card);
-  border-radius: var(--sa-radius-sm);
-  color: var(--sa-text-secondary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  box-shadow: var(--sa-shadow-sm);
-  transition: background-color 0.15s, color 0.15s;
-}
-
-.mobile-toggle-btn:hover {
-  background-color: var(--sa-bg);
-  color: var(--sa-text);
-}
-
-.mobile-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.4);
-  backdrop-filter: blur(4px);
-  z-index: 1030;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.25s ease;
-}
-
-.mobile-overlay.show {
-  opacity: 1;
-  pointer-events: auto;
-}
-
 /* ---------- Modern Sidebar ---------- */
 
 /* Reserva o espaço da sidebar ANTES do JS injetar o conteúdo (partials/sidebar.html
@@ -414,30 +372,28 @@ h1, h2, h3, .h4, .h6 {
   line-height: 1.2;
 }
 
-.sidebar-logout {
-  padding: 12px;
-}
-
-.sidebar-logout-btn {
+/* Botão de sair como ícone, dentro da própria linha de perfil (ao lado do
+   nome/avatar) — antes era uma linha inteira embaixo, ocupando espaço à toa. */
+.sidebar-logout-icon-btn {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
   display: flex;
   align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 10px 14px;
-  font-size: 14px;
+  justify-content: center;
   border: none;
   background: none;
-  color: var(--sa-danger);
+  color: var(--sa-text-secondary);
   border-radius: var(--sa-radius-sm);
   cursor: pointer;
-  transition: background-color 0.15s, color 0.15s;
-  text-align: left;
-  font-weight: 500;
+  font-size: 17px;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.sidebar-logout-btn:hover {
+.sidebar-logout-icon-btn:hover,
+.sidebar-logout-icon-btn:focus-visible {
   background-color: #fef2f2;
-  color: #b91c1c;
+  color: var(--sa-danger);
 }
 
 /* ---------- Collapsed State (Desktop only) ---------- */
@@ -449,8 +405,7 @@ h1, h2, h3, .h4, .h6 {
 
   .sidebar-col.collapsed .brand-text,
   .sidebar-col.collapsed .nav-label,
-  .sidebar-col.collapsed .sidebar-user-text,
-  .sidebar-col.collapsed .logout-label {
+  .sidebar-col.collapsed .sidebar-user-text {
     display: none !important;
   }
 
@@ -542,43 +497,13 @@ h1, h2, h3, .h4, .h6 {
     visibility: visible;
   }
 
+  /* Com o nome/empresa escondido, sobram só o avatar e o botão de sair —
+     empilhados (em vez de lado a lado) para caber bem na largura estreita. */
   .sidebar-col.collapsed .sidebar-profile {
+    flex-direction: column;
     justify-content: center;
-    padding: 14px 10px;
-  }
-
-  .sidebar-col.collapsed .sidebar-logout {
-    padding: 8px;
-  }
-
-  .sidebar-col.collapsed .sidebar-logout-btn {
-    justify-content: center;
-    padding: 10px;
-    position: relative;
-  }
-
-  .sidebar-col.collapsed .sidebar-logout-btn::after {
-    content: "Sair";
-    position: absolute;
-    left: 100%;
-    margin-left: 12px;
-    background-color: #1e293b;
-    color: #ffffff;
-    padding: 6px 10px;
-    font-size: 12px;
-    border-radius: 6px;
-    white-space: nowrap;
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.15s, visibility 0.15s;
-    z-index: 1050;
-    pointer-events: none;
-    box-shadow: var(--sa-shadow);
-  }
-
-  .sidebar-col.collapsed .sidebar-logout-btn:hover::after {
-    opacity: 1;
-    visibility: visible;
+    gap: 8px;
+    padding: 14px 6px;
   }
 }
 
@@ -591,25 +516,302 @@ h1, h2, h3, .h4, .h6 {
 
   .main-content {
     padding: 20px;
-    padding-top: 76px !important; /* Padding top so content is not blocked by floating hamburger btn */
+    /* Espaço embaixo pra conteúdo não ficar atrás da bottom tab bar fixa. */
+    padding-bottom: calc(70px + env(safe-area-inset-bottom));
   }
 
+  /* A gaveta lateral (drawer) não existe mais no mobile — os 7 itens do menu
+     ficam direto na bottom tab bar abaixo, sem gaveta secundária pra abrir.
+     "Sair" mora dentro da página Configurações (ver empresa.html). */
   .sidebar-col {
-    position: fixed;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    width: 280px;
-    height: 100vh;
-    transform: translateX(-100%);
-    box-shadow: none;
-    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    display: none;
   }
 
-  .sidebar-col.mobile-open {
-    transform: translateX(0);
-    box-shadow: 0 0 24px rgba(15, 23, 42, 0.15);
+  /* Cabeçalho de página (título + botão(ões) de ação): no desktop ficam lado
+     a lado, mas espremidos num celular o texto dos botões quebra em várias
+     linhas e fica enorme/feio. No mobile empilha — título em cima, botão(ões)
+     embaixo ocupando a largura toda. */
+  .page-header {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 10px;
   }
+
+  .page-header-actions {
+    flex-direction: column;
+  }
+
+  .page-header-actions .btn,
+  .page-header > .btn {
+    width: 100%;
+  }
+
+  /* Tabela "empilhada" no mobile (.table-stack-mobile): cada linha vira um
+     cartão, cada célula vira um bloco rotulado (data-label) em vez de coluna
+     estreita. Resolve especificamente colunas de texto longo (ex: campo de
+     Observações da tabela de lojas em precificacao.html) que, como coluna,
+     ficavam espremidas e explodiam a altura da linha com o texto quebrando
+     em várias linhas — no cartão, o texto flui normalmente em largura cheia. */
+  .table-stack-mobile thead {
+    display: none;
+  }
+
+  .table-stack-mobile,
+  .table-stack-mobile tbody,
+  .table-stack-mobile tr,
+  .table-stack-mobile td {
+    display: block;
+    width: 100%;
+  }
+
+  .table-stack-mobile tr {
+    margin-bottom: 10px;
+    border: 1px solid var(--sa-border);
+    border-radius: var(--sa-radius-sm);
+    padding: 4px 12px;
+  }
+
+  .table-stack-mobile tr:last-child {
+    margin-bottom: 0;
+  }
+
+  .table-stack-mobile td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 7px 0;
+    border-top: 1px solid var(--sa-border);
+    text-align: right;
+  }
+
+  .table-stack-mobile td:first-child {
+    border-top: none;
+  }
+
+  .table-stack-mobile td::before {
+    content: attr(data-label);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--sa-text-secondary);
+    flex-shrink: 0;
+    text-align: left;
+  }
+
+  /* Campos de texto longo (ex: Observações): rótulo em cima, texto embaixo
+     ocupando a largura toda, em vez de espremido do lado do rótulo. */
+  .table-stack-mobile td.td-stack-full {
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .table-stack-mobile tr.table-empty-row td,
+  .table-stack-mobile td.table-empty {
+    display: block;
+    border: none;
+    text-align: center;
+  }
+
+  .table-stack-mobile td.table-empty::before {
+    content: none;
+  }
+
+  /* Tabela "híbrida" no mobile (.table-hybrid-mobile, ex: Lançamentos): em
+     vez de empilhar as 7 colunas uma embaixo da outra (fica longo demais
+     numa lista com muitas linhas), cada linha vira um cartão de só 2 linhas
+     — descrição+valor em cima, tipo/sócio/data+ações embaixo. As colunas
+     "de verdade" (d-md-table-cell) somem no mobile; quem aparece é a célula
+     .lanc-mobile-card (d-md-none), com o layout de 2 linhas em flex. */
+  .table-hybrid-mobile thead {
+    display: none;
+  }
+
+  .lanc-mobile-card {
+    padding: 12px 4px;
+    border-bottom: 1px solid var(--sa-border);
+  }
+
+  .table-hybrid-mobile tbody tr:last-child .lanc-mobile-card {
+    border-bottom: none;
+  }
+
+  .lanc-line-1 {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 10px;
+    font-weight: 600;
+  }
+
+  .lanc-descricao {
+    min-width: 0;
+    overflow-wrap: break-word;
+  }
+
+  .lanc-valor {
+    flex-shrink: 0;
+    font-weight: 700;
+  }
+
+  .lanc-line-2 {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin-top: 6px;
+  }
+
+  .lanc-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 5px;
+    min-width: 0;
+    font-size: 12px;
+    color: var(--sa-text-secondary);
+  }
+
+  .lanc-meta-sep {
+    color: var(--sa-border);
+  }
+
+  .lanc-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  /* Tabelas-resumo do dashboard (.table-summary-mobile: Divisão do lucro,
+     Despesas pagas por sócio, Acerto entre sócios) — no mobile ficam cortadas
+     de lado porque têm 3-4 colunas. Aqui cada linha vira um cartão de 2
+     linhas: nome do sócio sozinho em cima, e o resto dos dados (rotulados)
+     numa segunda linha centralizada, quebrando se precisar. */
+  .table-summary-mobile thead {
+    display: none;
+  }
+
+  .table-summary-mobile,
+  .table-summary-mobile tbody {
+    display: block;
+    width: 100%;
+  }
+
+  .table-summary-mobile tr {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 4px 22px;
+    border: 1px solid var(--sa-border);
+    border-radius: var(--sa-radius-sm);
+    padding: 10px 12px 12px;
+    margin-bottom: 10px;
+  }
+
+  .table-summary-mobile tr:last-child {
+    margin-bottom: 0;
+  }
+
+  .table-summary-mobile td {
+    display: block;
+    border: none !important;
+    padding: 0 !important;
+    text-align: center;
+  }
+
+  .table-summary-mobile td.summary-name {
+    flex: 0 0 100%;
+    width: 100%;
+    font-weight: 600;
+    font-size: 14px;
+    padding-bottom: 8px !important;
+    margin-bottom: 4px !important;
+    border-bottom: 1px solid var(--sa-border) !important;
+  }
+
+  .table-summary-mobile td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 10.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--sa-text-secondary);
+    margin-bottom: 2px;
+  }
+
+  .table-summary-mobile td.table-empty {
+    flex: 0 0 100%;
+    width: 100%;
+  }
+}
+
+/* ---------- Bottom Tab Bar (mobile) ---------- */
+/* Barra fixa full-width com os 7 itens do menu, rótulo por extenso (sem
+   abreviar) — texto pode quebrar em 2 linhas em telas estreitas em vez de
+   cortar com reticências. Item ativo: ícone com um pulinho + linha embaixo
+   do texto do tamanho exato do rótulo. Tudo em CSS puro. */
+.bottom-tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1060;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-around;
+  background-color: var(--sa-card);
+  border-top: 1px solid var(--sa-border);
+  padding: 6px 2px calc(6px + env(safe-area-inset-bottom));
+  box-shadow: 0 -2px 14px rgba(15, 23, 42, 0.06);
+}
+
+.bottom-tab {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 2px;
+  border: none;
+  background: none;
+  text-decoration: none;
+  color: var(--sa-text-secondary);
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+/* O rótulo (.bottom-tab-label) continua no HTML como texto pra leitor de
+   tela (classe .visually-hidden do Bootstrap) — só o ícone aparece na tela. */
+.bottom-tab-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  font-size: 21px;
+  line-height: 1;
+  transition: background-color 0.2s ease;
+}
+
+.bottom-tab.active {
+  color: var(--sa-teal-dark);
+}
+
+.bottom-tab.active .bottom-tab-icon {
+  background-color: var(--sa-teal-light);
+  animation: saIconBounce 0.5s ease;
+}
+
+@keyframes saIconBounce {
+  0%, 100% { transform: translateY(0); }
+  20% { transform: translateY(-4px); }
+  40% { transform: translateY(0); }
+  60% { transform: translateY(-2px); }
+  80% { transform: translateY(0); }
 }
 
 /* ---------- Cards ---------- */
@@ -934,6 +1136,265 @@ h1, h2, h3, .h4, .h6 {
   color: var(--sa-primary);
   border-bottom: 2px solid var(--sa-teal);
   background: none;
+}
+
+/* ---------- Login/Cadastro (tela de entrada) ---------- */
+
+/* Abas em formato "segmented control" (pill), só na tela de entrada — visual
+   mais moderno que o sublinhado padrão usado em Configurações. Some ao
+   .nav-tabs (não substitui), então o resto do site não é afetado. */
+.auth-tabs {
+  background-color: var(--sa-bg);
+  border: none;
+  border-radius: 999px;
+  padding: 4px;
+  gap: 4px;
+}
+
+.auth-tabs .nav-item {
+  flex: 1 1 0;
+}
+
+.auth-tabs .nav-link {
+  width: 100%;
+  margin-right: 0;
+  border: none;
+  border-radius: 999px;
+  color: var(--sa-text-secondary);
+  font-weight: 600;
+  font-size: 13.5px;
+  padding: 8px 12px;
+  text-align: center;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.auth-tabs .nav-link.active {
+  background-color: var(--sa-card);
+  color: var(--sa-primary);
+  border-bottom: none;
+  box-shadow: var(--sa-shadow-sm);
+}
+
+/* Ícone dentro dos campos de usuário/senha/etc. */
+.auth-input-group .input-group-text {
+  background-color: var(--sa-card);
+  border-color: var(--sa-border);
+  color: var(--sa-text-secondary);
+}
+
+.auth-input-group .form-control {
+  border-left: none;
+}
+
+.auth-input-group:focus-within .input-group-text,
+.auth-input-group:focus-within .password-toggle-btn {
+  border-color: var(--sa-teal);
+}
+
+.auth-input-group:focus-within .input-group-text {
+  color: var(--sa-teal-dark);
+}
+
+/* Botão de mostrar/ocultar senha (ícone de olho). */
+.password-toggle-btn.btn-outline-secondary {
+  background-color: var(--sa-card);
+  border-color: var(--sa-border);
+  color: var(--sa-text-secondary);
+}
+
+.password-toggle-btn.btn-outline-secondary:hover,
+.password-toggle-btn.btn-outline-secondary:focus {
+  background-color: var(--sa-bg);
+  color: var(--sa-text);
+}
+
+/* Card um pouco mais "premium": cantos maiores, mais respiro interno. */
+.auth-card .card-sa {
+  border-radius: 18px;
+  padding: 28px 24px;
+}
+
+.auth-card .btn-primary {
+  padding: 10px;
+  font-weight: 600;
+}
+
+/* Animação de entrada: logo e card sobem com fade, levemente defasados um
+   do outro para dar sensação de sequência ao abrir a tela. */
+@keyframes sa-auth-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.auth-logo-anim {
+  animation: sa-auth-fade-up 0.5s ease both;
+}
+
+.auth-card-anim {
+  animation: sa-auth-fade-up 0.55s ease both;
+  animation-delay: 0.12s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-logo-anim,
+  .auth-card-anim {
+    animation: none;
+  }
+}
+
+/* Animação de entrada ao logar/criar conta: troca as abas + formulário por
+   uma telinha de "sistema carregando" — saudação com o nome do sócio,
+   checklist das áreas do sistema marcando uma a uma, e barra de progresso —
+   antes de navegar pra dashboard.html (ver showAuthLoading em js/auth.js).
+   Sem isso, o clique em "Entrar" não dava nenhum feedback visual até a
+   página trocar. */
+.auth-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 2px 2px;
+  text-align: center;
+  animation: sa-auth-fade-up 0.35s ease both;
+}
+
+.auth-loading-logo {
+  height: 64px;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  margin-bottom: 18px;
+  animation: sa-loading-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes sa-loading-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.04); opacity: 0.85; }
+}
+
+.auth-loading-welcome {
+  font-size: 16.5px;
+  font-weight: 700;
+  color: var(--sa-text);
+  margin-bottom: 2px;
+}
+
+.auth-loading-nome {
+  color: var(--sa-teal-dark);
+}
+
+.auth-loading-subtitle {
+  font-size: 12.5px;
+  color: var(--sa-text-secondary);
+  margin-bottom: 18px;
+}
+
+.auth-loading-checklist {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 18px;
+  width: 100%;
+  text-align: left;
+}
+
+.auth-loading-checklist li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 2px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--sa-text-secondary);
+  opacity: 0.55;
+  transition: color 0.2s ease, opacity 0.2s ease;
+}
+
+.auth-loading-checklist li.active,
+.auth-loading-checklist li.done {
+  color: var(--sa-text);
+  opacity: 1;
+}
+
+.auth-loading-check-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 2px solid var(--sa-border);
+  font-size: 12px;
+  color: transparent;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.auth-loading-checklist li.active .auth-loading-check-icon {
+  border-color: var(--sa-border);
+  border-top-color: var(--sa-teal);
+  animation: sa-spin 0.6s linear infinite;
+}
+
+.auth-loading-checklist li.done .auth-loading-check-icon {
+  border-color: var(--sa-teal);
+  background-color: var(--sa-teal);
+  color: #ffffff;
+  font-size: 12px;
+}
+
+@keyframes sa-spin {
+  to { transform: rotate(360deg); }
+}
+
+.auth-loading-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.auth-loading-bar {
+  flex: 1 1 auto;
+  height: 6px;
+  border-radius: 999px;
+  background-color: var(--sa-bg);
+  overflow: hidden;
+}
+
+.auth-loading-bar-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--sa-teal), var(--sa-primary));
+  /* Sem transition: a largura é atualizada a cada frame via
+     requestAnimationFrame (ver animateProgressBar em js/auth.js), então uma
+     transition aqui só atrasaria/travaria o movimento em vez de suavizar. */
+}
+
+.auth-loading-pct {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--sa-teal-dark);
+  flex-shrink: 0;
+  min-width: 32px;
+  text-align: right;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-loading-logo,
+  .auth-loading-checklist li.active .auth-loading-check-icon {
+    animation: none;
+  }
+
+  .auth-loading-bar-fill {
+    transition: none;
+  }
 }
 
 /* ---------- Logo da empresa (sidebar) ---------- */

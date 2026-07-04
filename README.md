@@ -102,20 +102,18 @@ socioall-app/
 ├── index.html            # login / cadastro (por usuário)
 ├── dashboard.html        # resumo financeiro + divisão entre sócios
 ├── lancamentos.html      # receitas e despesas (criar, editar, excluir, comprovante)
-├── socios.html           # sócios e percentuais (criar, editar, excluir, resetar senha)
 ├── categorias.html       # categorias de lançamento (criar, excluir)
 ├── relatorios.html       # extrato filtrável + exportação CSV (paginado)
-├── empresa.html          # dados da empresa: nome, site, endereço, logo
+├── empresa.html          # Configurações: aba "Dados da empresa" (nome, site, endereço, logo) + aba "Sócios" (percentuais, resetar senha, histórico de alterações)
 ├── css/style.css         # tokens de design (cores, tipografia, toasts, paginação)
 ├── js/
 │   ├── supabaseClient.js # config do Supabase + helpers (auth, toast, confirm modal, loading)
 │   ├── auth.js
 │   ├── dashboard.js
-│   ├── socios.js
+│   ├── empresa.js        # dados da empresa + gestão de sócios (as duas abas de empresa.html)
 │   ├── lancamentos.js
 │   ├── categorias.js
-│   ├── relatorios.js
-│   └── empresa.js
+│   └── relatorios.js
 ├── api/
 │   └── reset-senha-socio.js  # função serverless (Vercel) — reset de senha entre sócios
 ├── sql/
@@ -132,13 +130,13 @@ socioall-app/
 - Login e cadastro por usuário (sem e-mail real)
 - Convite de sócio: dá para adicionar um sócio antes dele ter conta; ao criar login com o mesmo usuário, ele entra direto na empresa certa
 - Lançamentos (receitas/despesas): criar, editar, excluir, anexar **vários** comprovantes por lançamento, paginação
-- Sócios: criar, editar, excluir (não é possível excluir o próprio registro, nem no banco), resetar senha de outro sócio
+- Sócios: criar, editar, excluir (não é possível excluir o próprio registro, nem no banco), resetar senha de outro sócio — tudo na aba "Sócios" de Configurações
 - Categorias: criar e excluir pela interface (sem duplicar nome + tipo)
 - Relatórios com filtro por período/tipo, paginação e exportação em CSV e PDF (exporta tudo que bate com o filtro, não só a página visível)
 - Dashboard com gráfico de receitas x despesas dos últimos 6 meses e divisão do lucro entre sócios
-- Configurações da empresa: nome, site, endereço e logo — aparecem no menu lateral de todas as telas internas
+- Configurações: nome, site, endereço e logo da empresa (aparecem no menu lateral de todas as telas internas) e gestão de sócios, em duas abas na mesma página
 - Percentual dos sócios não pode passar de 100% (bloqueado no banco)
-- Log de auditoria (`audit_logs`) para criação/edição/exclusão de lançamentos e sócios, visível em Sócios > Histórico de alterações
+- Log de auditoria (`audit_logs`) para criação/edição/exclusão de lançamentos e sócios, visível em Configurações > Sócios > Histórico de alterações
 - Notificações (toast) e confirmação em modal no lugar de `alert()`/`confirm()` do navegador
 - Textos de usuário (nomes, descrições) são escapados antes de exibir, evitando XSS
 - Headers de segurança (CSP, X-Frame-Options, HSTS, etc.) configurados em `vercel.json`

@@ -15,17 +15,11 @@
 </head>
 <body>
 
-<button class="mobile-toggle-btn d-md-none" onclick="toggleMobileSidebar()" aria-label="Toggle menu" id="mobileToggleBtn">
-  <i class="bi bi-list" id="mobileToggleIcon"></i>
-</button>
-
-<div class="mobile-overlay d-md-none" id="mobileOverlay" onclick="toggleMobileSidebar()"></div>
-
 <div class="app-shell">
   <div id="sidebarMount"></div>
 
   <main class="main-content">
-      <div class="d-flex justify-content-between align-items-center mb-4">
+      <div class="d-flex justify-content-between align-items-center mb-4 page-header">
         <h1 class="h4 mb-0">Calculadora de Preços</h1>
         <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#lojasModal">
           <i class="bi bi-shop me-1"></i>Gerenciar lojas
@@ -155,7 +149,7 @@
       <div class="modal-body">
         <p class="text-muted small">Taxas de comissão pesquisadas como ponto de partida — os marketplaces mudam a política com frequência, então confira e ajuste sempre que precisar.</p>
         <div class="table-responsive mb-4">
-          <table class="table table-sa table-sm">
+          <table class="table table-sa table-sm table-stack-mobile">
             <thead><tr><th>Nome</th><th>Taxa %</th><th>Taxa fixa (R$)</th><th>Observações</th><th>Atualizado em</th><th></th></tr></thead>
             <tbody id="lojasTableBody"></tbody>
           </table>

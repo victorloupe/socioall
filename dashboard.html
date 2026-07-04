@@ -15,12 +15,6 @@
 </head>
 <body>
 
-<button class="mobile-toggle-btn d-md-none" onclick="toggleMobileSidebar()" aria-label="Toggle menu" id="mobileToggleBtn">
-  <i class="bi bi-list" id="mobileToggleIcon"></i>
-</button>
-
-<div class="mobile-overlay d-md-none" id="mobileOverlay" onclick="toggleMobileSidebar()"></div>
-
 <div class="app-shell">
   <div id="sidebarMount"></div>
 
@@ -69,7 +63,7 @@
           <div class="card-sa h-100">
             <h2 class="h6 mb-3">Divisão do lucro entre sócios</h2>
             <div class="table-responsive">
-              <table class="table table-sa mb-0">
+              <table class="table table-sa mb-0 table-summary-mobile">
                 <thead><tr><th>Sócio</th><th>Percentual</th><th>Valor a receber</th></tr></thead>
                 <tbody id="divisaoTableBody"></tbody>
               </table>
@@ -80,13 +74,25 @@
           <div class="card-sa h-100">
             <h2 class="h6 mb-3">Despesas pagas por sócio</h2>
             <div class="table-responsive">
-              <table class="table table-sa mb-0">
+              <table class="table table-sa mb-0 table-summary-mobile">
                 <thead><tr><th>Sócio</th><th>Total pago</th><th>% das despesas</th></tr></thead>
                 <tbody id="despesasSociosTableBody"></tbody>
               </table>
             </div>
           </div>
         </div>
+      </div>
+
+      <div class="card-sa mt-3">
+        <h2 class="h6 mb-1">Acerto entre sócios</h2>
+        <p class="text-secondary small mb-3">Compara quanto cada sócio pagou/recebeu do próprio bolso com a parte que cabia a ele no resultado (conforme o % de participação) — e mostra quem deve reembolsar quem.</p>
+        <div class="table-responsive mb-3">
+          <table class="table table-sa mb-0 table-summary-mobile">
+            <thead><tr><th>Sócio</th><th>Parte no resultado</th><th>Pagou/recebeu de fato</th><th>Saldo</th></tr></thead>
+            <tbody id="acertoTableBody"></tbody>
+          </table>
+        </div>
+        <div id="acertoSugestoes"></div>
       </div>
   </main>
 </div>

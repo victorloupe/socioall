@@ -28,21 +28,6 @@ function toggleSidebar() {
   localStorage.setItem("sa_sidebar_collapsed", collapsed ? "1" : "0");
 }
 
-// Abre/fecha o menu lateral em dispositivos móveis.
-function toggleMobileSidebar() {
-  const el = document.getElementById("sidebarCol");
-  const overlay = document.getElementById("mobileOverlay");
-  if (!el) return;
-  const isOpen = el.classList.toggle("mobile-open");
-  if (overlay) {
-    overlay.classList.toggle("show", isOpen);
-  }
-  const icon = document.getElementById("mobileToggleIcon");
-  if (icon) {
-    icon.className = isOpen ? "bi bi-x" : "bi bi-list";
-  }
-}
-
 // Quando o menu está recolhido, a busca vira só um ícone. Clicar nele expande
 // o menu de novo e já foca o campo de busca, para digitar na hora.
 function expandSidebarAndFocusSearch() {

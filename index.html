@@ -16,28 +16,62 @@
 
 <div class="auth-wrapper">
   <div class="auth-card">
-    <div class="text-center mb-4">
+    <div class="text-center mb-4 auth-logo-anim">
       <img src="logo-full.png" alt="SócioAll — Gestão de contas entre sócios" class="login-logo">
     </div>
 
-    <div class="card-sa">
-      <ul class="nav nav-tabs mb-3" id="authTabs">
+    <div class="card-sa auth-card-anim">
+      <ul class="nav nav-tabs mb-3 auth-tabs" id="authTabs">
         <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#loginTab">Entrar</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#signupTab">Criar conta</button></li>
       </ul>
 
       <div id="authError" class="alert alert-danger d-none py-2 small" role="alert"></div>
 
+      <!-- Mostrado no lugar das abas/formulário assim que o login/cadastro dá
+           certo: uma telinha de "sistema carregando" com o nome do sócio, uma
+           checklist das áreas do sistema marcando uma a uma, e uma barra de
+           progresso — no lugar de já navegar direto pra dashboard.html sem
+           feedback nenhum (ver showAuthLoading em js/auth.js). -->
+      <div id="authLoading" class="auth-loading d-none">
+        <img src="logo-full.png" alt="SócioAll" class="auth-loading-logo" id="authLoadingLogo">
+        <p class="auth-loading-welcome">Bem-vindo, <span id="authLoadingNome" class="auth-loading-nome">Sócio</span>!</p>
+        <p class="auth-loading-subtitle" id="authLoadingText">Preparando seu espaço...</p>
+
+        <ul class="auth-loading-checklist" id="authLoadingChecklist">
+          <li><span class="auth-loading-check-label">Dashboard</span><span class="auth-loading-check-icon"></span></li>
+          <li><span class="auth-loading-check-label">Pedidos</span><span class="auth-loading-check-icon"></span></li>
+          <li><span class="auth-loading-check-label">Calculadora de Preços</span><span class="auth-loading-check-icon"></span></li>
+          <li><span class="auth-loading-check-label">Lançamentos</span><span class="auth-loading-check-icon"></span></li>
+          <li><span class="auth-loading-check-label">Categorias</span><span class="auth-loading-check-icon"></span></li>
+          <li><span class="auth-loading-check-label">Relatórios</span><span class="auth-loading-check-icon"></span></li>
+        </ul>
+
+        <div class="auth-loading-bar-row">
+          <div class="auth-loading-bar"><div class="auth-loading-bar-fill" id="authLoadingBarFill"></div></div>
+          <span class="auth-loading-pct" id="authLoadingPct">0%</span>
+        </div>
+      </div>
+
       <div class="tab-content">
         <div class="tab-pane fade show active" id="loginTab">
           <form id="loginForm">
             <div class="mb-3">
               <label class="form-label small" for="loginEmail">Usuário</label>
-              <input type="text" class="form-control" id="loginEmail" pattern="[a-zA-Z0-9_.\-]+" autocapitalize="off" autocorrect="off" required>
+              <div class="input-group auth-input-group">
+                <span class="input-group-text"><i class="bi bi-person"></i></span>
+                <input type="text" class="form-control" id="loginEmail" pattern="[a-zA-Z0-9_.\-]+" autocapitalize="off" autocorrect="off" required>
+              </div>
             </div>
             <div class="mb-3">
               <label class="form-label small" for="loginPassword">Senha</label>
-              <input type="password" class="form-control" id="loginPassword" autocomplete="current-password" required>
+              <div class="input-group auth-input-group">
+                <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                <input type="password" class="form-control" id="loginPassword" autocomplete="current-password" required>
+                <button type="button" class="btn btn-outline-secondary password-toggle-btn" onclick="togglePasswordVisibility('loginPassword', this)" aria-label="Mostrar senha">
+                  <i class="bi bi-eye"></i>
+                </button>
+              </div>
             </div>
             <button type="submit" class="btn btn-primary w-100">Entrar</button>
           </form>
@@ -47,21 +81,36 @@
           <form id="signupForm">
             <div class="mb-3">
               <label class="form-label small" for="signupNome">Seu nome</label>
-              <input type="text" class="form-control" id="signupNome" required>
+              <div class="input-group auth-input-group">
+                <span class="input-group-text"><i class="bi bi-person-badge"></i></span>
+                <input type="text" class="form-control" id="signupNome" required>
+              </div>
             </div>
             <div class="mb-3">
               <label class="form-label small" for="signupEmpresa">Nome da empresa</label>
-              <input type="text" class="form-control" id="signupEmpresa" required>
+              <div class="input-group auth-input-group">
+                <span class="input-group-text"><i class="bi bi-building"></i></span>
+                <input type="text" class="form-control" id="signupEmpresa" required>
+              </div>
               <div class="form-text">Se você foi adicionado como sócio por outra pessoa, esse nome é ignorado — você entra direto na empresa do convite.</div>
             </div>
             <div class="mb-3">
               <label class="form-label small" for="signupEmail">Usuário</label>
-              <input type="text" class="form-control" id="signupEmail" pattern="[a-zA-Z0-9_.\-]+" autocapitalize="off" autocorrect="off" required>
+              <div class="input-group auth-input-group">
+                <span class="input-group-text"><i class="bi bi-person"></i></span>
+                <input type="text" class="form-control" id="signupEmail" pattern="[a-zA-Z0-9_.\-]+" autocapitalize="off" autocorrect="off" required>
+              </div>
               <div class="form-text">Só letras, números, ponto, hífen ou underline — sem espaços.</div>
             </div>
             <div class="mb-3">
               <label class="form-label small" for="signupPassword">Senha</label>
-              <input type="password" class="form-control" id="signupPassword" minlength="6" autocomplete="new-password" required>
+              <div class="input-group auth-input-group">
+                <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                <input type="password" class="form-control" id="signupPassword" minlength="6" autocomplete="new-password" required>
+                <button type="button" class="btn btn-outline-secondary password-toggle-btn" onclick="togglePasswordVisibility('signupPassword', this)" aria-label="Mostrar senha">
+                  <i class="bi bi-eye"></i>
+                </button>
+              </div>
             </div>
             <button type="submit" class="btn btn-primary w-100">Criar conta e empresa</button>
           </form>

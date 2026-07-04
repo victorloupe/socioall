@@ -5,7 +5,9 @@
 
 // Injeta a sidebar (partials/sidebar.html) dentro de um elemento com
 // id="sidebarMount" e marca o item de menu correspondente a activePage.
-// activePage é um dos: dashboard, lancamentos, socios, categorias, relatorios, empresa
+// activePage é um dos: dashboard, lancamentos, pedidos, categorias, relatorios,
+// precificacao, empresa (a página "empresa" cobre tanto a aba "Dados da
+// empresa" quanto a aba "Sócios", já que as duas foram mescladas numa página só)
 //
 // Como cada página é um HTML separado (sem SPA), navegar entre elas recarrega
 // tudo do zero — sem cache, isso fazia o menu "piscar" (sumir e reaparecer) a
@@ -23,6 +25,11 @@ async function injectSidebar(activePage) {
     mount.innerHTML = html;
     const link = mount.querySelector(`.nav-link[data-page="${activePage}"]`);
     if (link) link.classList.add("active");
+
+    // Os 7 itens da bottom tab bar (mobile, só ícone) usam o mesmo data-page da sidebar.
+    const bottomTab = mount.querySelector(`.bottom-tab[data-page="${activePage}"]`);
+    if (bottomTab) bottomTab.classList.add("active");
+
     initSidebarState();
   };
 

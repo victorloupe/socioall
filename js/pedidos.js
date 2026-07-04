@@ -124,10 +124,10 @@ async function loadPedidos() {
       <td class="text-end text-nowrap">
         ${p.status === "pendente" 
           ? `<button class="btn btn-sm btn-outline-success me-1" title="Faturar no Caixa" onclick="faturarPedido('${p.id}', this)"><i class="bi bi-currency-dollar"></i> Faturar</button>
-             <button class="btn btn-sm btn-outline-warning me-1" title="Cancelar Pedido" onclick="cancelarPedido('${p.id}', this)"><i class="bi bi-x-circle"></i></button>`
+             <button class="btn btn-sm btn-outline-warning me-1" title="Cancelar Pedido" aria-label="Cancelar pedido ${escapeHtml(p.numero_pedido || "")}" onclick="cancelarPedido('${p.id}', this)"><i class="bi bi-x-circle"></i></button>`
           : ""
         }
-        <button class="btn btn-sm btn-outline-danger" title="Excluir Registro" onclick="excluirPedido('${p.id}', this)"><i class="bi bi-trash"></i></button>
+        <button class="btn btn-sm btn-outline-danger" title="Excluir Registro" aria-label="Excluir registro do pedido ${escapeHtml(p.numero_pedido || "")}" onclick="excluirPedido('${p.id}', this)"><i class="bi bi-trash"></i></button>
       </td>
     `;
     tbody.appendChild(tr);
@@ -389,12 +389,12 @@ async function cancelarPedido(pedidoId, btnEl) {
 
 // Exclui permanentemente o pedido do banco de dados
 async function excluirPedido(pedidoId, btnEl) {
-  const confirm = await confirmDialog("Tem certeza que deseja excluir permanentemente o registro deste pedido?", {
+  const ok = await confirmDialog("Tem certeza que deseja excluir permanentemente o registro deste pedido?", {
     confirmText: "Excluir",
     danger: true
   });
 
-  if (!confirm) return;
+  if (!ok) return;
 
   const originalText = btnEl.innerHTML;
   btnEl.disabled = true;
