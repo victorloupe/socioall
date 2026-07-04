@@ -208,4 +208,40 @@ function confirmDialog(message, { confirmText = "Confirmar", danger = true } = {
     };
     const onHidden = () => {
       okBtn.removeEventListener("click", onOk);
- 
+      modalEl.removeEventListener("hidden.bs.modal", onHidden);
+      if (!resolved) resolve(false);
+    };
+
+    okBtn.addEventListener("click", onOk);
+    modalEl.addEventListener("hidden.bs.modal", onHidden);
+    modal.show();
+  });
+}
+
+// Mostra um estado de carregamento numa tabela enquanto os dados não chegam.
+function tableLoading(tbodyId, colspan, label = "Carregando...") {
+  const tbody = document.getElementById(tbodyId);
+  if (tbody) {
+    tbody.innerHTML = `<tr><td colspan="${colspan}" class="table-empty"><span class="spinner-border spinner-border-sm me-2"></span>${label}</td></tr>`;
+  }
+}
+
+// Anima a entrada das linhas de uma tabela (fade + leve deslize), com um
+// pequeno atraso crescente entre elas. Chame depois de terminar de preencher
+// o <tbody>. Aceita o próprio elemento <tbody> ou o id dele.
+function animateTableRows(tbodyOrId) {
+  const tbody = typeof tbodyOrId === "string" ? document.getElementById(tbodyOrId) : tbodyOrId;
+  if (!tbody) return;
+  tbody.querySelectorAll("tr").forEach((tr, i) => {
+    tr.classList.add("row-enter");
+    tr.style.animationDelay = `${Math.min(i * 30, 300)}ms`;
+  });
+}
+
+function formatCurrency(value) {
+  return (value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function formatDate(dateStr) {
+  return new Date(dateStr + "T00:00:00").toLocaleDateString("pt-BR");
+}

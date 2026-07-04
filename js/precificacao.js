@@ -264,4 +264,170 @@ function atualizarResultado() {
   const taxaPercentual = Number(document.getElementById("calcTaxaPercentual").value) || 0;
   const taxaFixa = Number(document.getElementById("calcTaxaFixa").value) || 0;
 
-  // Lucro em % incide sobre o custo do pro
+  // Lucro em % incide sobre o custo do produto + embalagem + operacional.
+  const custoBase = custoProduto + custoEmbalagem + custoOperacional;
+  const lucro = lucroTipo === "percentual" ? custoBase * (lucroInput / 100) : lucroInput;
+
+  if (taxaPercentual >= 100) {
+    showToast("A taxa percentual da loja precisa ser menor que 100%.", "error");
+    return;
+  }
+
+  const resultado = calcularPrecoVenda({ custoProduto, custoEmbalagem, custoOperacional, lucro, taxaPercentual, taxaFixa });
+
+  document.getElementById("resPrecoVenda").textContent = formatCurrency(resultado.precoVenda);
+  document.getElementById("resCustoProduto").textContent = formatCurrency(custoProduto);
+  document.getElementById("resEmbalagem").textContent = formatCurrency(custoEmbalagem);
+  document.getElementById("resOperacional").textContent = formatCurrency(custoOperacional);
+  document.getElementById("resLucro").textContent = lucroTipo === "percentual"
+    ? `${lucroInput.toFixed(2)}% (${formatCurrency(lucro)})`
+    : formatCurrency(lucro);
+  document.getElementById("resTaxaFixa").textContent = formatCurrency(taxaFixa);
+  document.getElementById("resTaxaPercentual").textContent = `${taxaPercentual.toFixed(2)}% (${formatCurrency(resultado.valorTaxaPercentual)})`;
+  document.getElementById("resLiquido").textContent = formatCurrency(resultado.liquido);
+
+  ultimoCalculo = {
+    nome_produto: document.getElementById("calcNomeProduto").value.trim(),
+    link_venda: document.getElementById("calcLinkVenda").value.trim() || null,
+    link_referencia: document.getElementById("calcLinkReferencia").value.trim() || null,
+    loja_id: selectedLojaId || null,
+    custo_produto: custoProduto,
+    custo_embalagem: custoEmbalagem,
+    custo_operacional: custoOperacional,
+    lucro_desejado: lucro,
+    taxa_percentual_usada: taxaPercentual,
+    taxa_fixa_usada: taxaFixa,
+    preco_venda: resultado.precoVenda
+  };
+
+  document.getElementById("salvarCalculoBtn").disabled = false;
+}
+
+const calculadoraForm = document.getElementById("calculadoraForm");
+if (calculadoraForm) {
+  calculadoraForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    atualizarResultado();
+  });
+
+  // Recalcula em tempo real conforme os campos vão sendo preenchidos.
+  calculadoraForm.addEventListener("input", atualizarResultado);
+  calculadoraForm.addEventListener("change", atualizarResultado);
+}
+
+document.getElementById("salvarCalculoBtn")?.addEventListener("click", async (e) => {
+  if (!ultimoCalculo) return;
+  if (!ultimoCalculo.nome_produto) {
+    showToast("Informe o nome do produto antes de salvar.", "error");
+    return;
+  }
+
+  const btn = e.currentTarget;
+  await withLoadingButton(btn, "Salvando...", async () => {
+    const { error } = await supabaseClient.from("calculos_preco").insert({
+      empresa_id: currentEmpresaId,
+      socio_id: currentSocioId,
+      ...ultimoCalculo
+    });
+
+    if (error) {
+      showToast(friendlyErrorMessage(error, "Não foi possível salvar o cálculo."), "error");
+      return;
+    }
+
+    showToast("Cálculo salvo no histórico.");
+    btn.disabled = true;
+    await loadHistorico();
+  });
+});
+
+// ---------- Histórico ----------
+
+let historicoCache = [];
+
+async function loadHistorico() {
+  tableLoading("historicoTableBody", 5);
+
+  const { data, error } = await supabaseClient
+    .from("calculos_preco")
+    .select("id, nome_produto, link_venda, link_referencia, preco_venda, custo_produto, custo_embalagem, custo_operacional, lucro_desejado, taxa_percentual_usada, taxa_fixa_usada, created_at, lojas_ecommerce(nome)")
+    .eq("empresa_id", currentEmpresaId)
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  if (error) {
+    showToast(friendlyErrorMessage(error, "Não foi possível carregar o histórico."), "error");
+    return;
+  }
+
+  historicoCache = data || [];
+  const tbody = document.getElementById("historicoTableBody");
+  tbody.innerHTML = "";
+
+  if (historicoCache.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="table-empty"><i class="bi bi-clock-history fs-4 d-block mb-2"></i>Nenhum cálculo salvo ainda. Calcular sem clicar em "Salvar" não fica registrado aqui.</td></tr>';
+    return;
+  }
+
+  historicoCache.forEach(c => {
+    const tr = document.createElement("tr");
+    tr.style.cursor = "pointer";
+    tr.setAttribute("role", "button");
+    tr.setAttribute("aria-label", `Ver detalhes do cálculo de ${escapeHtml(c.nome_produto)}`);
+    tr.onclick = () => verCalculo(c.id);
+    tr.innerHTML = `
+      <td>${escapeHtml(c.nome_produto)}</td>
+      <td>${escapeHtml(c.lojas_ecommerce?.nome || "Manual")}</td>
+      <td>${formatCurrency(c.preco_venda)}</td>
+      <td>${formatDate(c.created_at.slice(0, 10))}</td>
+      <td class="text-end">
+        <button type="button" class="btn btn-sm btn-outline-danger" aria-label="Excluir cálculo de ${escapeHtml(c.nome_produto)}" onclick="event.stopPropagation(); excluirCalculo('${c.id}')"><i class="bi bi-trash"></i></button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  animateTableRows(tbody);
+}
+
+// Mostra num modal o detalhamento completo de um cálculo já salvo.
+function verCalculo(id) {
+  const c = historicoCache.find(h => h.id === id);
+  if (!c) return;
+
+  document.getElementById("verCalculoTitulo").textContent = c.nome_produto;
+  document.getElementById("verPrecoVenda").textContent = formatCurrency(c.preco_venda);
+  document.getElementById("verLoja").textContent = c.lojas_ecommerce?.nome || "Manual";
+  document.getElementById("verCustoProduto").textContent = formatCurrency(c.custo_produto);
+  document.getElementById("verEmbalagem").textContent = formatCurrency(c.custo_embalagem);
+  document.getElementById("verOperacional").textContent = formatCurrency(c.custo_operacional);
+  document.getElementById("verLucro").textContent = formatCurrency(c.lucro_desejado);
+  document.getElementById("verTaxaFixa").textContent = formatCurrency(c.taxa_fixa_usada);
+  document.getElementById("verTaxaPercentual").textContent = `${Number(c.taxa_percentual_usada).toFixed(2)}%`;
+
+  const linksWrapper = document.getElementById("verLinksWrapper");
+  linksWrapper.innerHTML = "";
+  if (c.link_venda) {
+    linksWrapper.innerHTML += `<a href="${escapeHtml(c.link_venda)}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-secondary"><i class="bi bi-box-arrow-up-right me-1"></i>Link de venda</a>`;
+  }
+  if (c.link_referencia) {
+    linksWrapper.innerHTML += `<a href="${escapeHtml(c.link_referencia)}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-secondary"><i class="bi bi-box-arrow-up-right me-1"></i>Link de referência</a>`;
+  }
+
+  bootstrap.Modal.getOrCreateInstance(document.getElementById("verCalculoModal")).show();
+}
+
+async function excluirCalculo(id) {
+  const ok = await confirmDialog("Excluir este cálculo do histórico?", { confirmText: "Excluir" });
+  if (!ok) return;
+
+  const { error } = await supabaseClient.from("calculos_preco").delete().eq("id", id);
+  if (error) {
+    showToast(friendlyErrorMessage(error, "Não foi possível excluir o cálculo."), "error");
+    return;
+  }
+  showToast("Cálculo excluído do histórico.");
+  await loadHistorico();
+}
+
+initPrecificacao();

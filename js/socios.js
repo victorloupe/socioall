@@ -223,4 +223,72 @@ if (resetSenhaSocioForm) {
       bootstrap.Modal.getInstance(document.getElementById("resetSenhaModal")).hide();
       showToast("Senha redefinida com sucesso.");
     } catch (err) {
-      showToast(err.mess
+      showToast(err.message || "Não foi possível redefinir a senha.", "error");
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = originalText;
+    }
+  });
+}
+
+// ---------- Histórico de alterações (auditoria) ----------
+// Alimentado por triggers no banco (tabela audit_logs) em lancamentos e
+// socios — nenhuma escrita é feita daqui, só leitura. Ver sql/schema_completo.sql.
+
+const AUDIT_ACAO_LABEL = { insert: "Criou", update: "Editou", delete: "Excluiu" };
+const AUDIT_TABELA_LABEL = { lancamentos: "lançamento", socios: "sócio" };
+
+function descreverAuditItem(item) {
+  const dados = item.dados_novos || item.dados_antigos || {};
+  if (item.tabela === "lancamentos") {
+    return dados.descricao ? `${escapeHtml(dados.descricao)} (${formatCurrency(dados.valor || 0)})` : "—";
+  }
+  if (item.tabela === "socios") {
+    return dados.nome ? escapeHtml(dados.nome) : "—";
+  }
+  return "—";
+}
+
+async function loadAuditLog() {
+  const tbody = document.getElementById("auditLogTableBody");
+  if (!tbody) return;
+  tableLoading("auditLogTableBody", 4);
+
+  const { data, error } = await supabaseClient
+    .from("audit_logs")
+    .select("id, tabela, acao, created_at, dados_antigos, dados_novos, socios(nome)")
+    .eq("empresa_id", currentEmpresaId)
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  if (error) {
+    // Tabela pode ainda não existir se o schema_completo.sql atualizado
+    // ainda não foi rodado no Supabase — falha silenciosa é melhor que
+    // travar a página de sócios com um toast de erro.
+    tbody.innerHTML = '<tr><td colspan="4" class="table-empty">Histórico indisponível.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = "";
+
+  if (!data || data.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" class="table-empty"><i class="bi bi-clock-history fs-4 d-block mb-2"></i>Nenhuma alteração registrada ainda.</td></tr>';
+    return;
+  }
+
+  data.forEach(item => {
+    const tr = document.createElement("tr");
+    const acaoBadge = item.acao === "delete" ? "badge-despesa" : (item.acao === "insert" ? "badge-receita" : "");
+    tr.innerHTML = `
+      <td class="small text-muted">${formatDate(item.created_at.slice(0, 10))} ${item.created_at.slice(11, 16)}</td>
+      <td>${escapeHtml(item.socios?.nome || "—")}</td>
+      <td>${AUDIT_TABELA_LABEL[item.tabela] || escapeHtml(item.tabela)}: ${descreverAuditItem(item)}</td>
+      <td>${acaoBadge ? `<span class="badge ${acaoBadge}">${AUDIT_ACAO_LABEL[item.acao] || item.acao}</span>` : (AUDIT_ACAO_LABEL[item.acao] || item.acao)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  animateTableRows(tbody);
+}
+
+initSocios();

@@ -142,4 +142,11 @@ socioall-app/
 - Notificações (toast) e confirmação em modal no lugar de `alert()`/`confirm()` do navegador
 - Textos de usuário (nomes, descrições) são escapados antes de exibir, evitando XSS
 - Headers de segurança (CSP, X-Frame-Options, HSTS, etc.) configurados em `vercel.json`
-- Identidade visual baseada na logo (navy `#
+- Identidade visual baseada na logo (navy `#072150` + teal `#0EA79A`)
+- **Calculadora de preços de e-commerce** (`precificacao.html`): cadastro de lojas/marketplaces com taxa de comissão (% + taxa fixa por venda) — já vem com Mercado Livre, Shopee e Amazon pré-cadastrados com taxas de referência pesquisadas (editáveis, pois os marketplaces mudam a política com frequência; a tela mostra a data da última revisão e avisa quando está desatualizada). A calculadora soma custo do produto + embalagem (padrão R$ 1) + custo operacional + lucro desejado, e já embute a taxa da loja escolhida no preço de venda sugerido. Calcular não salva nada por padrão; só grava no histórico se você clicar em "Salvar no histórico" (com nome do produto, link de venda e link de referência).
+- **Pedidos** (`pedidos.html`): estrutura pronta (tabela `pedidos_ecommerce`) para uma futura integração automática com os marketplaces — por enquanto é só uma tela vazia, sem nenhuma sincronização ativa.
+
+## Próximos passos sugeridos
+
+- Suporte a mais de uma empresa por usuário
+- Integração real de pedidos dos marketplaces em `pedidos.html` (hoje é só a estrutura, sem sincronização)

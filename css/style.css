@@ -884,4 +884,159 @@ h1, h2, h3, .h4, .h6 {
 
 .auth-card {
   width: 100%;
-  max-
+  max-width: 380px;
+}
+
+.auth-card .card-sa {
+  box-shadow: var(--sa-shadow);
+}
+
+.login-logo {
+  width: 100%;
+  max-width: 220px;
+  height: auto;
+}
+
+.nav-tabs {
+  border-bottom: 1px solid var(--sa-border);
+}
+
+.nav-tabs .nav-link {
+  border: none;
+  color: var(--sa-text-secondary);
+  font-weight: 600;
+  padding: 8px 4px;
+  margin-right: 20px;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+}
+
+.nav-tabs .nav-link.active {
+  color: var(--sa-primary);
+  border-bottom: 2px solid var(--sa-teal);
+  background: none;
+}
+
+/* ---------- Logo da empresa (sidebar) ---------- */
+
+.sidebar-empresa-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+/* ---------- Toasts (substituem alert()) ---------- */
+
+.sa-toast-container {
+  position: fixed;
+  top: 76px;
+  right: 20px;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 320px;
+}
+
+.sa-toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-radius: var(--sa-radius-sm);
+  background: var(--sa-card);
+  box-shadow: var(--sa-shadow);
+  border-left: 3px solid var(--sa-teal);
+  font-size: 14px;
+  opacity: 0;
+  transform: translateX(12px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.sa-toast.show {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.sa-toast-error { border-left-color: var(--sa-danger); }
+.sa-toast-error i { color: var(--sa-danger); }
+.sa-toast-warning { border-left-color: #F59E0B; }
+.sa-toast-warning i { color: #F59E0B; }
+.sa-toast-success i { color: var(--sa-teal-dark); }
+
+@media (max-width: 767px) {
+  .sa-toast-container {
+    left: 12px;
+    right: 12px;
+    max-width: none;
+  }
+}
+
+/* ---------- Configurações da empresa ---------- */
+
+.empresa-logo-preview {
+  width: 88px;
+  height: 88px;
+  border-radius: 14px;
+  object-fit: cover;
+  background: var(--sa-teal-light);
+  border: 1px solid var(--sa-border);
+}
+
+.empresa-logo-placeholder {
+  width: 88px;
+  height: 88px;
+  border-radius: 14px;
+  background: var(--sa-teal-light);
+  color: var(--sa-teal-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  border: 1px solid var(--sa-border);
+}
+
+/* Reserva uma altura mínima (~10 linhas) nas listas que mudam de tamanho com
+   frequência (filtro, paginação, ou o próprio conteúdo crescendo/diminuindo)
+   — sem isso, a tela "pisca"/pula porque o card encolhe e cresce de novo a
+   cada busca, empurrando o resto da página. Não é aplicado em tabelas de
+   cadastro pequenas e estáveis (sócios, categorias, lojas), só nas listas. */
+.table-list-min {
+  min-height: 460px;
+}
+
+/* ---------- Paginação ---------- */
+
+.sa-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 24px;
+  border-top: 1px solid var(--sa-border);
+  font-size: 13px;
+  color: var(--sa-text-secondary);
+}
+
+/* ---------- Alerts ---------- */
+
+.alert {
+  border: none;
+  border-radius: var(--sa-radius-sm);
+}
+
+.alert-danger {
+  background-color: #FEF2F2;
+  color: #991B1B;
+}
+
+.alert-success {
+  background-color: var(--sa-teal-light);
+  color: var(--sa-teal-dark);
+}
+
+.alert-warning {
+  background-color: #FFFBEB;
+  color: #92400E;
+}

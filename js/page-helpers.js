@@ -42,4 +42,47 @@ async function injectSidebar(activePage) {
   try {
     const resp = await fetch("partials/sidebar.html");
     const html = await resp.text();
-    sessionStorage.se
+    sessionStorage.setItem(SIDEBAR_CACHE_KEY, html);
+    render(html);
+  } catch (err) {
+    console.error("Falha ao carregar o menu lateral:", err);
+  }
+}
+
+// Boilerplate padrão de toda página autenticada: injeta sidebar, valida
+// sessão, carrega contexto da empresa, preenche o card de usuário no rodapé.
+// Retorna o ctx (empresaId, empresaNome, socioId, ...) ou null se falhar
+// (já mostra um toast de erro amigável em vez de deixar a tela em branco).
+async function initAuthenticatedPage(activePage) {
+  await injectSidebar(activePage);
+
+  // Mostra na hora o nome/empresa/logo da última vez que carregou (cache em
+  // sessionStorage), em vez de deixar aparecer "SócioAll"/"?"/"—" por um
+  // instante enquanto a consulta de verdade ainda não voltou.
+  const cachedCtx = getCachedEmpresaContext();
+  if (cachedCtx) renderSidebarUser(cachedCtx);
+
+  const session = await requireAuth();
+  if (!session) return null;
+  const ctx = await getEmpresaContext();
+  if (!ctx) {
+    showToast("Não foi possível carregar os dados da sua empresa. Recarregue a página ou entre novamente.", "error");
+    return null;
+  }
+  renderSidebarUser(ctx);
+  return ctx;
+}
+
+// Desabilita um botão de submit com texto de "carregando" enquanto roda fn,
+// e restaura ao final (sucesso ou erro).
+async function withLoadingButton(submitBtn, loadingText, fn) {
+  const originalText = submitBtn.textContent;
+  submitBtn.disabled = true;
+  submitBtn.textContent = loadingText;
+  try {
+    await fn();
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = originalText;
+  }
+}

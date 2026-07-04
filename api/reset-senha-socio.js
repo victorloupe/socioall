@@ -103,4 +103,39 @@ module.exports = async function handler(req, res) {
   }
 
   if (targetSocio.empresa_id !== callerSocio.empresa_id) {
-    re
+    res.status(403).json({ error: "Esse sócio não é da sua empresa." });
+    return;
+  }
+
+  if (!targetSocio.user_id) {
+    res.status(400).json({ error: "Esse sócio ainda não criou login — não há senha para resetar." });
+    return;
+  }
+
+  // 4) Reseta a senha via API administrativa (só possível com a service role key).
+  const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(targetSocio.user_id, {
+    password: String(novaSenha)
+  });
+
+  if (updateError) {
+    // O detalhe técnico fica só no log do servidor (Vercel), não é exposto
+    // ao usuário final, para não vazar detalhes internos do Supabase/Postgres.
+    console.error("Erro ao redefinir senha do sócio:", updateError);
+    res.status(500).json({ error: "Não foi possível redefinir a senha. Tente novamente em instantes." });
+    return;
+  }
+
+  // 5) Log de auditoria: registra quem resetou a senha de quem e quando.
+  // Falha aqui não deve impedir a resposta de sucesso ao usuário.
+  const { error: logError } = await supabaseAdmin.from("reset_senha_logs").insert({
+    empresa_id: callerSocio.empresa_id,
+    caller_user_id: callerUserId,
+    caller_socio_id: callerSocio.id,
+    target_socio_id: targetSocio.id
+  });
+  if (logError) {
+    console.error("Falha ao registrar log de auditoria do reset de senha:", logError);
+  }
+
+  res.status(200).json({ ok: true });
+};

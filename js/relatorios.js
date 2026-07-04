@@ -153,4 +153,100 @@ async function exportarCSV() {
     return;
   }
 
-  if (!lancament
+  if (!lancamentos || lancamentos.length === 0) {
+    showToast("Nenhum lançamento para exportar com esse filtro.", "warning");
+    return;
+  }
+
+  const rows = [["Data", "Descrição", "Tipo", "Sócio", "Valor"]];
+  lancamentos.forEach(l => {
+    rows.push([
+      formatDate(l.data),
+      l.descricao,
+      l.tipo,
+      l.socios?.nome || "—",
+      formatCurrency(l.valor)
+    ]);
+  });
+
+  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "extrato-socioall.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Mesmo filtro do CSV, mas em PDF (jsPDF + autoTable, carregados via CDN) —
+// útil para anexar num e-mail ou imprimir, coisa que um CSV não cobre bem.
+async function exportarPDF() {
+  if (typeof window.jspdf === "undefined") {
+    showToast("Não foi possível carregar o gerador de PDF. Recarregue a página e tente de novo.", "error");
+    return;
+  }
+
+  const { data: lancamentos, error } = await buildQuery({ paginate: false });
+
+  if (error) {
+    showToast(friendlyErrorMessage(error, "Não foi possível exportar o PDF."), "error");
+    return;
+  }
+
+  if (!lancamentos || lancamentos.length === 0) {
+    showToast("Nenhum lançamento para exportar com esse filtro.", "warning");
+    return;
+  }
+
+  const dataInicio = document.getElementById("filtroDataInicio").value;
+  const dataFim = document.getElementById("filtroDataFim").value;
+  const tipo = document.getElementById("filtroTipo").value;
+
+  let totalReceitas = 0;
+  let totalDespesas = 0;
+  lancamentos.forEach(l => {
+    if (l.tipo === "receita") totalReceitas += Number(l.valor);
+    else totalDespesas += Number(l.valor);
+  });
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  doc.setFontSize(14);
+  doc.text("SócioAll — Extrato de lançamentos", 14, 16);
+
+  doc.setFontSize(9);
+  doc.setTextColor(100);
+  const periodoTexto = (dataInicio || dataFim)
+    ? `Período: ${dataInicio ? formatDate(dataInicio) : "início"} até ${dataFim ? formatDate(dataFim) : "hoje"}`
+    : "Período: todos os lançamentos";
+  const tipoTexto = tipo ? `Tipo: ${tipo}` : "Tipo: todos";
+  doc.text(`${periodoTexto}  |  ${tipoTexto}`, 14, 22);
+  doc.text(`Gerado em ${new Date().toLocaleString("pt-BR")}`, 14, 27);
+
+  doc.autoTable({
+    startY: 33,
+    head: [["Data", "Descrição", "Tipo", "Sócio", "Valor"]],
+    body: lancamentos.map(l => [
+      formatDate(l.data),
+      l.descricao,
+      l.tipo,
+      l.socios?.nome || "—",
+      formatCurrency(l.valor)
+    ]),
+    styles: { fontSize: 8 },
+    headStyles: { fillColor: [15, 76, 92] }
+  });
+
+  const finalY = doc.lastAutoTable.finalY + 8;
+  doc.setFontSize(10);
+  doc.setTextColor(0);
+  doc.text(`Total receitas: ${formatCurrency(totalReceitas)}`, 14, finalY);
+  doc.text(`Total despesas: ${formatCurrency(totalDespesas)}`, 14, finalY + 6);
+  doc.text(`Saldo do período: ${formatCurrency(totalReceitas - totalDespesas)}`, 14, finalY + 12);
+
+  doc.save("extrato-socioall.pdf");
+}
+
+initRelatorios();

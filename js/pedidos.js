@@ -47,4 +47,7 @@ async function loadPedidos() {
     tbody.appendChild(tr);
   });
 
-  animateTableRow
+  animateTableRows(tbody);
+}
+
+initPedidos();

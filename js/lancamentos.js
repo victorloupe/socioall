@@ -256,4 +256,97 @@ async function editarLancamento(id) {
 
   document.getElementById("lancamentoDescricao").value = l.descricao;
   document.getElementById("lancamentoValor").value = l.valor;
-  document.getElementById("l
+  document.getElementById("lancamentoData").value = l.data;
+  document.getElementById("lancamentoModalTitle").textContent = "Editar lançamento";
+  document.getElementById("lancamentoSubmitBtn").textContent = "Salvar alterações";
+  await renderComprovantesAtuais(l.id);
+
+  bootstrap.Modal.getOrCreateInstance(document.getElementById("novoLancamentoModal")).show();
+}
+
+async function excluirLancamento(id) {
+  const ok = await confirmDialog("Excluir este lançamento? Essa ação não pode ser desfeita.", { confirmText: "Excluir" });
+  if (!ok) return;
+
+  const { error } = await supabaseClient.from("lancamentos").delete().eq("id", id);
+  if (error) {
+    showToast(friendlyErrorMessage(error, "Não foi possível excluir o lançamento."), "error");
+    return;
+  }
+  showToast("Lançamento excluído.");
+  await loadLancamentos();
+}
+
+function resetLancamentoForm() {
+  document.getElementById("lancamentoEditId").value = "";
+  document.getElementById("lancamentoModalTitle").textContent = "Novo lançamento";
+  document.getElementById("lancamentoSubmitBtn").textContent = "Salvar lançamento";
+  document.getElementById("lancamentoComprovantesAtuais").innerHTML = "";
+  updateCategoriasSelect(); // Reseta para o tipo padrão (geralmente Receita)
+}
+
+document.getElementById("novoLancamentoModal").addEventListener("hidden.bs.modal", () => {
+  document.getElementById("novoLancamentoForm").reset();
+  resetLancamentoForm();
+});
+
+const novoLancamentoForm = document.getElementById("novoLancamentoForm");
+if (novoLancamentoForm) {
+  novoLancamentoForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const submitBtn = document.getElementById("lancamentoSubmitBtn");
+    const originalText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Salvando...";
+
+    try {
+      const editId = document.getElementById("lancamentoEditId").value;
+      const tipo = document.getElementById("lancamentoTipo").value;
+      const descricao = document.getElementById("lancamentoDescricao").value.trim();
+      const valor = parseFloat(document.getElementById("lancamentoValor").value);
+      const data = document.getElementById("lancamentoData").value;
+      const categoriaId = document.getElementById("lancamentoCategoria").value || null;
+      const arquivos = Array.from(document.getElementById("lancamentoComprovante").files || []);
+
+      let lancamentoId = editId;
+
+      if (editId) {
+        const { error } = await supabaseClient.from("lancamentos").update({
+          tipo,
+          descricao,
+          valor,
+          data,
+          categoria_id: categoriaId
+        }).eq("id", editId);
+        if (error) throw error;
+      } else {
+        const { data: inserted, error } = await supabaseClient.from("lancamentos").insert({
+          empresa_id: currentEmpresaId,
+          socio_id: currentSocioId,
+          categoria_id: categoriaId,
+          tipo,
+          descricao,
+          valor,
+          data
+        }).select().single();
+        if (error) throw error;
+        lancamentoId = inserted.id;
+      }
+
+      if (arquivos.length > 0) {
+        await uploadComprovantes(arquivos, lancamentoId);
+      }
+
+      bootstrap.Modal.getInstance(document.getElementById("novoLancamentoModal")).hide();
+      showToast(editId ? "Lançamento atualizado." : "Lançamento criado.");
+      await loadLancamentos();
+    } catch (err) {
+      showToast(friendlyErrorMessage(err, "Não foi possível salvar o lançamento."), "error");
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = originalText;
+    }
+  });
+}
+
+initLancamentos();

@@ -121,4 +121,21 @@ if (novaCategoriaForm) {
 
       const { error } = await supabaseClient.from("categorias").insert({
         empresa_id: currentEmpresaId,
-   
+        nome,
+        tipo
+      });
+
+      if (error) {
+        showToast(friendlyErrorMessage(error, "Não foi possível criar a categoria."), "error");
+        return;
+      }
+
+      novaCategoriaForm.reset();
+      bootstrap.Modal.getInstance(document.getElementById("novaCategoriaModal")).hide();
+      showToast("Categoria criada.");
+      await loadCategorias();
+    });
+  });
+}
+
+initCategorias();
