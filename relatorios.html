@@ -28,20 +28,26 @@
       <h1 class="h4 mb-4">Relatórios</h1>
 
       <form id="filtroForm" class="card-sa mb-4 row g-2 align-items-end">
-        <div class="col-12 col-md-3">
+        <div class="col-12 col-md-2">
           <label class="form-label small" for="filtroDataInicio">De</label>
           <input type="date" class="form-control" id="filtroDataInicio">
         </div>
-        <div class="col-12 col-md-3">
+        <div class="col-12 col-md-2">
           <label class="form-label small" for="filtroDataFim">Até</label>
           <input type="date" class="form-control" id="filtroDataFim">
         </div>
-        <div class="col-12 col-md-3">
+        <div class="col-12 col-md-2">
           <label class="form-label small" for="filtroTipo">Tipo</label>
           <select class="form-select" id="filtroTipo">
             <option value="">Todos</option>
             <option value="receita">Receita</option>
             <option value="despesa">Despesa</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-3">
+          <label class="form-label small" for="filtroSocio">Sócio</label>
+          <select class="form-select" id="filtroSocio">
+            <option value="">Todos</option>
           </select>
         </div>
         <div class="col-12 col-md-3 d-flex gap-2">

@@ -14,13 +14,39 @@ async function initRelatorios() {
   if (!ctx) return;
   currentEmpresaId = ctx.empresaId;
 
+  await loadSocios();
   await loadRelatorio({ recalcularResumo: true });
+}
+
+async function loadSocios() {
+  const select = document.getElementById("filtroSocio");
+  if (!select) return;
+
+  const { data: socios, error } = await supabaseClient
+    .from("socios")
+    .select("id, nome")
+    .eq("empresa_id", currentEmpresaId)
+    .order("nome", { ascending: true });
+
+  if (error) {
+    showToast(friendlyErrorMessage(error, "Não foi possível carregar os sócios para o filtro."), "error");
+    return;
+  }
+
+  select.innerHTML = '<option value="">Todos</option>';
+  (socios || []).forEach(s => {
+    const opt = document.createElement("option");
+    opt.value = s.id;
+    opt.textContent = s.nome;
+    select.appendChild(opt);
+  });
 }
 
 function buildQuery({ paginate }) {
   const dataInicio = document.getElementById("filtroDataInicio").value;
   const dataFim = document.getElementById("filtroDataFim").value;
   const tipo = document.getElementById("filtroTipo").value;
+  const socioId = document.getElementById("filtroSocio")?.value || "";
 
   let query = supabaseClient
     .from("lancamentos")
@@ -31,6 +57,7 @@ function buildQuery({ paginate }) {
   if (dataInicio) query = query.gte("data", dataInicio);
   if (dataFim) query = query.lte("data", dataFim);
   if (tipo) query = query.eq("tipo", tipo);
+  if (socioId) query = query.eq("socio_id", socioId);
 
   if (paginate) {
     const from = currentPage * PAGE_SIZE;

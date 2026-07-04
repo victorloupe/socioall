@@ -5,6 +5,7 @@ const PAGE_SIZE = 25;
 let currentPage = 0;
 let totalLancamentos = 0;
 let categoriasCache = [];
+let sociosCache = [];
 
 async function initLancamentos() {
   const ctx = await initAuthenticatedPage('lancamentos');
@@ -12,10 +13,14 @@ async function initLancamentos() {
   currentEmpresaId = ctx.empresaId;
   currentSocioId = ctx.socioId;
 
-  // Filtra as categorias dinamicamente quando o tipo de lançamento mudar
-  document.getElementById("lancamentoTipo")?.addEventListener("change", updateCategoriasSelect);
+  // Filtra as categorias e atualiza a label do sócio dinamicamente quando o tipo de lançamento mudar
+  document.getElementById("lancamentoTipo")?.addEventListener("change", () => {
+    updateCategoriasSelect();
+    updateSocioLabel();
+  });
 
   await loadCategorias();
+  await loadSocios();
   await loadLancamentos();
 }
 
@@ -50,6 +55,53 @@ function updateCategoriasSelect() {
     });
 
   select.value = currentVal;
+}
+
+async function loadSocios() {
+  const { data: socios, error } = await supabaseClient
+    .from("socios")
+    .select("id, nome")
+    .eq("empresa_id", currentEmpresaId)
+    .order("nome", { ascending: true });
+
+  if (error) {
+    showToast(friendlyErrorMessage(error, "Não foi possível carregar os sócios."), "error");
+  }
+
+  sociosCache = socios || [];
+  updateSociosSelect();
+  updateSocioLabel();
+}
+
+function updateSociosSelect() {
+  const select = document.getElementById("lancamentoSocio");
+  if (!select) return;
+  const currentVal = select.value;
+
+  select.innerHTML = '<option value="">Sem sócio</option>';
+  sociosCache.forEach(s => {
+    const opt = document.createElement("option");
+    opt.value = s.id;
+    opt.textContent = s.nome;
+    select.appendChild(opt);
+  });
+
+  if (currentVal) {
+    select.value = currentVal;
+  } else if (!document.getElementById("lancamentoEditId").value && currentSocioId) {
+    select.value = currentSocioId;
+  }
+}
+
+function updateSocioLabel() {
+  const label = document.querySelector('label[for="lancamentoSocio"]');
+  if (!label) return;
+  const tipo = document.getElementById("lancamentoTipo").value;
+  if (tipo === "despesa") {
+    label.textContent = "Quem pagou (Sócio)";
+  } else {
+    label.textContent = "Quem recebeu (Sócio)";
+  }
 }
 
 async function loadLancamentos() {
@@ -240,7 +292,7 @@ async function excluirComprovante(comprovanteId, path, lancamentoId) {
 async function editarLancamento(id) {
   const { data: l, error } = await supabaseClient
     .from("lancamentos")
-    .select("id, tipo, descricao, valor, data, categoria_id")
+    .select("id, tipo, descricao, valor, data, categoria_id, socio_id")
     .eq("id", id)
     .single();
 
@@ -253,6 +305,8 @@ async function editarLancamento(id) {
   document.getElementById("lancamentoTipo").value = l.tipo;
   updateCategoriasSelect(); // Atualiza a lista filtrada no select antes de setar o ID da categoria
   document.getElementById("lancamentoCategoria").value = l.categoria_id || "";
+  document.getElementById("lancamentoSocio").value = l.socio_id || "";
+  updateSocioLabel();
 
   document.getElementById("lancamentoDescricao").value = l.descricao;
   document.getElementById("lancamentoValor").value = l.valor;
@@ -283,6 +337,7 @@ function resetLancamentoForm() {
   document.getElementById("lancamentoSubmitBtn").textContent = "Salvar lançamento";
   document.getElementById("lancamentoComprovantesAtuais").innerHTML = "";
   updateCategoriasSelect(); // Reseta para o tipo padrão (geralmente Receita)
+  updateSociosSelect();
 }
 
 document.getElementById("novoLancamentoModal").addEventListener("hidden.bs.modal", () => {
@@ -306,6 +361,7 @@ if (novoLancamentoForm) {
       const valor = parseFloat(document.getElementById("lancamentoValor").value);
       const data = document.getElementById("lancamentoData").value;
       const categoriaId = document.getElementById("lancamentoCategoria").value || null;
+      const socioId = document.getElementById("lancamentoSocio").value || null;
       const arquivos = Array.from(document.getElementById("lancamentoComprovante").files || []);
 
       let lancamentoId = editId;
@@ -316,13 +372,14 @@ if (novoLancamentoForm) {
           descricao,
           valor,
           data,
-          categoria_id: categoriaId
+          categoria_id: categoriaId,
+          socio_id: socioId
         }).eq("id", editId);
         if (error) throw error;
       } else {
         const { data: inserted, error } = await supabaseClient.from("lancamentos").insert({
           empresa_id: currentEmpresaId,
-          socio_id: currentSocioId,
+          socio_id: socioId,
           categoria_id: categoriaId,
           tipo,
           descricao,

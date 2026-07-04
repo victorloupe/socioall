@@ -34,7 +34,7 @@
         <div class="table-responsive table-list-min">
           <table class="table table-sa mb-0">
             <thead>
-              <tr><th>Data</th><th>Descrição</th><th>Tipo</th><th>Lançado por</th><th>Valor</th><th></th><th></th></tr>
+              <tr><th>Data</th><th>Descrição</th><th>Tipo</th><th>Quem pagou</th><th>Valor</th><th></th><th></th></tr>
             </thead>
             <tbody id="lancamentosTableBody"></tbody>
           </table>
@@ -82,6 +82,10 @@
           <div class="mb-3">
             <label class="form-label small" for="lancamentoCategoria">Categoria</label>
             <select class="form-select" id="lancamentoCategoria"></select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small" for="lancamentoSocio">Quem pagou (Sócio)</label>
+            <select class="form-select" id="lancamentoSocio"></select>
           </div>
           <div class="mb-3">
             <label class="form-label small" for="lancamentoComprovante">Comprovantes (opcional, pode escolher vários)</label>

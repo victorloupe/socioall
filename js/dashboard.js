@@ -3,10 +3,11 @@ async function initDashboard() {
   if (!ctx) return;
 
   tableLoading("divisaoTableBody", 3);
+  tableLoading("despesasSociosTableBody", 3);
 
   const { data: lancamentos, error: lancamentosError } = await supabaseClient
     .from("lancamentos")
-    .select("tipo, valor, data")
+    .select("tipo, valor, data, socio_id")
     .eq("empresa_id", ctx.empresaId);
 
   if (lancamentosError) {
@@ -27,7 +28,7 @@ async function initDashboard() {
 
   const { data: socios, error: sociosError } = await supabaseClient
     .from("socios")
-    .select("nome, percentual")
+    .select("id, nome, percentual")
     .eq("empresa_id", ctx.empresaId);
 
   if (sociosError) {
@@ -35,6 +36,7 @@ async function initDashboard() {
   }
 
   renderDivisaoTable(socios || [], lucro);
+  renderDespesasSociosTable(socios || [], lancamentos || [], despesas);
 }
 
 function renderDivisaoTable(socios, lucro) {
@@ -56,6 +58,59 @@ function renderDivisaoTable(socios, lucro) {
     `;
     tbody.appendChild(tr);
   });
+
+  animateTableRows(tbody);
+}
+
+function renderDespesasSociosTable(socios, lancamentos, totalDespesas) {
+  const tbody = document.getElementById("despesasSociosTableBody");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  if (!socios || socios.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="3" class="table-empty">Nenhum sócio cadastrado ainda.</td></tr>';
+    return;
+  }
+
+  const despesasLancamentos = (lancamentos || []).filter(l => l.tipo === "despesa");
+
+  const totalPorSocio = {};
+  socios.forEach(s => {
+    totalPorSocio[s.id] = 0;
+  });
+  let totalGeralEmpresa = 0;
+
+  despesasLancamentos.forEach(l => {
+    if (l.socio_id && totalPorSocio[l.socio_id] !== undefined) {
+      totalPorSocio[l.socio_id] += Number(l.valor);
+    } else {
+      totalGeralEmpresa += Number(l.valor);
+    }
+  });
+
+  socios.forEach(s => {
+    const valorPago = totalPorSocio[s.id];
+    const percDespesas = totalDespesas > 0 ? (valorPago / totalDespesas) * 100 : 0;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${escapeHtml(s.nome)}</td>
+      <td>${formatCurrency(valorPago)}</td>
+      <td class="text-muted">${percDespesas.toFixed(1)}%</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  if (totalGeralEmpresa > 0) {
+    const percDespesas = totalDespesas > 0 ? (totalGeralEmpresa / totalDespesas) * 100 : 0;
+    const tr = document.createElement("tr");
+    tr.className = "text-muted table-light";
+    tr.innerHTML = `
+      <td><em>Caixa Geral (Empresa)</em></td>
+      <td>${formatCurrency(totalGeralEmpresa)}</td>
+      <td class="text-muted">${percDespesas.toFixed(1)}%</td>
+    `;
+    tbody.appendChild(tr);
+  }
 
   animateTableRows(tbody);
 }
