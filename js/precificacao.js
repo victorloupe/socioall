@@ -133,42 +133,48 @@ function renderLojaTabs() {
   }
 
   container.innerHTML = abas.map(a => {
-    const isChecked = selectedLojasIds.includes(a.id);
+    const isSelected = selectedLojasIds.includes(a.id);
+    const isActive = a.id === selectedLojaId;
+
+    let btnClass = "btn btn-sm btn-outline-secondary"; // Não selecionado
+    if (isActive) {
+      btnClass = "btn btn-sm btn-primary shadow-sm"; // Selecionado + Focado/Ativo
+    } else if (isSelected) {
+      btnClass = "btn btn-sm btn-outline-primary bg-primary bg-opacity-10"; // Selecionado mas não focado
+    }
+
     return `
-      <li class="nav-item position-relative" role="presentation">
-        <span class="position-absolute start-0 top-50 translate-middle-y ps-2" style="z-index: 5;">
-          <input type="checkbox" class="form-check-input sa-loja-checkbox" data-loja-id="${a.id}" ${isChecked ? "checked" : ""} style="width: 14px; height: 14px; margin: 0; cursor: pointer;">
-        </span>
-        <button type="button" class="nav-link ${a.id === selectedLojaId ? "active" : ""}" style="padding-left: 38px !important;" data-loja-id="${a.id}" role="tab" aria-selected="${a.id === selectedLojaId}">
-          ${escapeHtml(a.nome)}
-        </button>
-      </li>
+      <button type="button" class="${btnClass} py-1.5 px-3 rounded-pill fw-semibold" data-loja-id="${a.id}" style="transition: all 0.2s; font-size: 0.8rem;">
+        ${escapeHtml(a.nome)}
+      </button>
     `;
   }).join("");
 
-  // Vincula listeners para os checkboxes
-  container.querySelectorAll(".sa-loja-checkbox").forEach(chk => {
-    chk.addEventListener("change", (e) => {
-      e.stopPropagation();
-      const id = e.target.dataset.lojaId;
-      if (e.target.checked) {
-        if (!selectedLojasIds.includes(id)) {
-          selectedLojasIds.push(id);
-        }
-      } else {
-        selectedLojasIds = selectedLojasIds.filter(x => x !== id);
-      }
-      atualizarResultado();
-    });
-  });
-
-  // Vincula listeners para a aba ativa
+  // Vincula os listeners de click nos botões para a seleção de dupla ação
   container.querySelectorAll("button[data-loja-id]").forEach(btn => {
     btn.addEventListener("click", (e) => {
-      selectedLojaId = e.currentTarget.dataset.lojaId;
-      if (!selectedLojasIds.includes(selectedLojaId)) {
-        selectedLojasIds.push(selectedLojaId);
+      const id = e.currentTarget.dataset.lojaId;
+      const isSelected = selectedLojasIds.includes(id);
+      const isActive = id === selectedLojaId;
+
+      if (!isSelected) {
+        // Clica em um cinza: seleciona e foca (fica azul sólido)
+        selectedLojasIds.push(id);
+        selectedLojaId = id;
+      } else if (isSelected && !isActive) {
+        // Clica em um azul claro: apenas foca ele (vira azul sólido)
+        selectedLojaId = id;
+      } else if (isSelected && isActive) {
+        // Clica no azul sólido (ativo): desmarca e volta a ficar cinza
+        selectedLojasIds = selectedLojasIds.filter(x => x !== id);
+        if (selectedLojasIds.length > 0) {
+          selectedLojaId = selectedLojasIds[selectedLojasIds.length - 1];
+        } else {
+          selectedLojaId = "";
+          selectedLojasIds = [""];
+        }
       }
+
       renderLojaTabs();
       atualizarResultado();
     });
