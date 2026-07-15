@@ -21,6 +21,25 @@ async function initLancamentos() {
 
   await loadCategorias();
   await loadSocios();
+  populateFilters();
+
+  document.getElementById("filtroSocio")?.addEventListener("change", () => {
+    currentPage = 0;
+    loadLancamentos();
+  });
+  document.getElementById("filtroCategoria")?.addEventListener("change", () => {
+    currentPage = 0;
+    loadLancamentos();
+  });
+  document.getElementById("btnLimparFiltros")?.addEventListener("click", () => {
+    const s = document.getElementById("filtroSocio");
+    if (s) s.value = "";
+    const c = document.getElementById("filtroCategoria");
+    if (c) c.value = "";
+    currentPage = 0;
+    loadLancamentos();
+  });
+
   await loadLancamentos();
 }
 
@@ -104,16 +123,52 @@ function updateSocioLabel() {
   }
 }
 
+function populateFilters() {
+  const filtroSocio = document.getElementById("filtroSocio");
+  if (filtroSocio) {
+    filtroSocio.innerHTML = '<option value="">Todos os sócios</option>';
+    sociosCache.forEach(s => {
+      const opt = document.createElement("option");
+      opt.value = s.id;
+      opt.textContent = s.nome;
+      filtroSocio.appendChild(opt);
+    });
+  }
+
+  const filtroCategoria = document.getElementById("filtroCategoria");
+  if (filtroCategoria) {
+    filtroCategoria.innerHTML = '<option value="">Todas as categorias</option>';
+    categoriasCache.forEach(c => {
+      const opt = document.createElement("option");
+      opt.value = c.id;
+      opt.textContent = `${c.nome} (${c.tipo === 'receita' ? 'Receita' : 'Despesa'})`;
+      filtroCategoria.appendChild(opt);
+    });
+  }
+}
+
 async function loadLancamentos() {
   tableLoading("lancamentosTableBody", 7);
 
   const from = currentPage * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
-  const { data: lancamentos, count, error } = await supabaseClient
+  const filtroSocioVal = document.getElementById("filtroSocio")?.value;
+  const filtroCategoriaVal = document.getElementById("filtroCategoria")?.value;
+
+  let query = supabaseClient
     .from("lancamentos")
     .select("id, tipo, descricao, valor, data, categoria_id, socios(nome), lancamento_comprovantes(id)", { count: "exact" })
-    .eq("empresa_id", currentEmpresaId)
+    .eq("empresa_id", currentEmpresaId);
+
+  if (filtroSocioVal) {
+    query = query.eq("socio_id", filtroSocioVal);
+  }
+  if (filtroCategoriaVal) {
+    query = query.eq("categoria_id", filtroCategoriaVal);
+  }
+
+  const { data: lancamentos, count, error } = await query
     .order("data", { ascending: false })
     .range(from, to);
 
@@ -375,58 +430,54 @@ if (novoLancamentoForm) {
   novoLancamentoForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const submitBtn = document.getElementById("lancamentoSubmitBtn");
-    const originalText = submitBtn.textContent;
-    submitBtn.disabled = true;
-    submitBtn.textContent = "Salvando...";
 
     try {
-      const editId = document.getElementById("lancamentoEditId").value;
-      const tipo = document.getElementById("lancamentoTipo").value;
-      const descricao = document.getElementById("lancamentoDescricao").value.trim();
-      const valor = parseFloat(document.getElementById("lancamentoValor").value);
-      const data = document.getElementById("lancamentoData").value;
-      const categoriaId = document.getElementById("lancamentoCategoria").value || null;
-      const socioId = document.getElementById("lancamentoSocio").value || null;
-      const arquivos = Array.from(document.getElementById("lancamentoComprovante").files || []);
+      await withLoadingButton(submitBtn, "Salvando...", async () => {
+        const editId = document.getElementById("lancamentoEditId").value;
+        const tipo = document.getElementById("lancamentoTipo").value;
+        const descricao = document.getElementById("lancamentoDescricao").value.trim();
+        const valor = parseFloat(document.getElementById("lancamentoValor").value);
+        const data = document.getElementById("lancamentoData").value;
+        const categoriaId = document.getElementById("lancamentoCategoria").value || null;
+        const socioId = document.getElementById("lancamentoSocio").value || null;
+        const arquivos = Array.from(document.getElementById("lancamentoComprovante").files || []);
 
-      let lancamentoId = editId;
+        let lancamentoId = editId;
 
-      if (editId) {
-        const { error } = await supabaseClient.from("lancamentos").update({
-          tipo,
-          descricao,
-          valor,
-          data,
-          categoria_id: categoriaId,
-          socio_id: socioId
-        }).eq("id", editId);
-        if (error) throw error;
-      } else {
-        const { data: inserted, error } = await supabaseClient.from("lancamentos").insert({
-          empresa_id: currentEmpresaId,
-          socio_id: socioId,
-          categoria_id: categoriaId,
-          tipo,
-          descricao,
-          valor,
-          data
-        }).select().single();
-        if (error) throw error;
-        lancamentoId = inserted.id;
-      }
+        if (editId) {
+          const { error } = await supabaseClient.from("lancamentos").update({
+            tipo,
+            descricao,
+            valor,
+            data,
+            categoria_id: categoriaId,
+            socio_id: socioId
+          }).eq("id", editId);
+          if (error) throw error;
+        } else {
+          const { data: inserted, error } = await supabaseClient.from("lancamentos").insert({
+            empresa_id: currentEmpresaId,
+            socio_id: socioId,
+            categoria_id: categoriaId,
+            tipo,
+            descricao,
+            valor,
+            data
+          }).select().single();
+          if (error) throw error;
+          lancamentoId = inserted.id;
+        }
 
-      if (arquivos.length > 0) {
-        await uploadComprovantes(arquivos, lancamentoId);
-      }
+        if (arquivos.length > 0) {
+          await uploadComprovantes(arquivos, lancamentoId);
+        }
 
-      bootstrap.Modal.getInstance(document.getElementById("novoLancamentoModal")).hide();
-      showToast(editId ? "Lançamento atualizado." : "Lançamento criado.");
-      await loadLancamentos();
+        bootstrap.Modal.getInstance(document.getElementById("novoLancamentoModal")).hide();
+        showToast(editId ? "Lançamento atualizado." : "Lançamento criado.");
+        await loadLancamentos();
+      });
     } catch (err) {
       showToast(friendlyErrorMessage(err, "Não foi possível salvar o lançamento."), "error");
-    } finally {
-      submitBtn.disabled = false;
-      submitBtn.textContent = originalText;
     }
   });
 }

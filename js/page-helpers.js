@@ -31,6 +31,7 @@ async function injectSidebar(activePage) {
     if (bottomTab) bottomTab.classList.add("active");
 
     initSidebarState();
+    setupThemeToggleListener();
   };
 
   const cached = sessionStorage.getItem(SIDEBAR_CACHE_KEY);
@@ -80,16 +81,45 @@ async function initAuthenticatedPage(activePage) {
   return ctx;
 }
 
-// Desabilita um botão de submit com texto de "carregando" enquanto roda fn,
+// Desabilita um botão de submit com spinner de "carregando" enquanto roda fn,
 // e restaura ao final (sucesso ou erro).
 async function withLoadingButton(submitBtn, loadingText, fn) {
-  const originalText = submitBtn.textContent;
+  const originalHtml = submitBtn.innerHTML;
   submitBtn.disabled = true;
-  submitBtn.textContent = loadingText;
+  submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> ${loadingText}`;
   try {
     await fn();
   } finally {
     submitBtn.disabled = false;
-    submitBtn.textContent = originalText;
+    submitBtn.innerHTML = originalHtml;
   }
+}
+
+function setupThemeToggleListener() {
+  const btn = document.getElementById("btnThemeToggle");
+  const mobileBtn = document.getElementById("btnMobileThemeToggle");
+  if (!btn && !mobileBtn) return;
+  
+  const updateToggleIcon = (isDark) => {
+    const icon = document.getElementById("themeToggleIcon");
+    if (icon) {
+      icon.className = isDark ? "bi bi-sun text-warning" : "bi bi-moon";
+    }
+    const mobileIcon = document.getElementById("mobileThemeToggleIcon");
+    if (mobileIcon) {
+      mobileIcon.className = isDark ? "bi bi-sun text-warning" : "bi bi-moon";
+    }
+  };
+
+  const isDarkInitial = document.documentElement.classList.contains("dark-theme");
+  updateToggleIcon(isDarkInitial);
+
+  const toggle = () => {
+    const isDark = document.documentElement.classList.toggle("dark-theme");
+    localStorage.setItem("sa_theme", isDark ? "dark" : "light");
+    updateToggleIcon(isDark);
+  };
+
+  if (btn) btn.onclick = toggle;
+  if (mobileBtn) mobileBtn.onclick = toggle;
 }

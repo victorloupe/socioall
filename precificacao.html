@@ -4,7 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SócioAll — Calculadora de Preços</title>
-<script>if (localStorage.getItem("sa_sidebar_collapsed") === "1") document.documentElement.classList.add("sa-sidebar-collapsed");</script>
+<script>
+  if (localStorage.getItem("sa_sidebar_collapsed") === "1") document.documentElement.classList.add("sa-sidebar-collapsed");
+  if (localStorage.getItem("sa_theme") === "dark") document.documentElement.classList.add("dark-theme");
+</script>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -27,24 +30,28 @@
       </div>
 
       <div class="row g-3 align-items-stretch">
-        <div class="col-12 col-lg-6 d-flex">
-          <div class="card-sa flex-fill">
+        <div class="col-12 col-lg-6 d-flex flex-column">
+          <div class="card-sa flex-fill d-flex flex-column">
             <h2 class="h6 mb-2">Calcular preço de venda</h2>
 
-            <form id="calculadoraForm">
+            <form id="calculadoraForm" class="d-flex flex-column flex-fill">
               <div class="mb-2">
                 <label class="form-label small" for="calcNomeProduto">Nome do produto</label>
                 <input type="text" class="form-control form-control-sm" id="calcNomeProduto" required>
               </div>
 
               <div class="row g-2 mb-2">
-                <div class="col-12 col-sm-6">
+                <div class="col-12 col-sm-4">
                   <label class="form-label small" for="calcLinkVenda">Link de venda</label>
                   <input type="url" class="form-control form-control-sm" id="calcLinkVenda" placeholder="Seu anúncio (opcional)">
                 </div>
-                <div class="col-12 col-sm-6">
+                <div class="col-12 col-sm-4">
                   <label class="form-label small" for="calcLinkReferencia">Link de referência</label>
                   <input type="url" class="form-control form-control-sm" id="calcLinkReferencia" placeholder="Base de comparação (opcional)">
+                </div>
+                <div class="col-12 col-sm-4">
+                  <label class="form-label small" for="calcPrecoReferencia">Preço de referência (R$)</label>
+                  <input type="number" step="0.01" min="0" class="form-control form-control-sm" id="calcPrecoReferencia" placeholder="Preço concorrente (opcional)">
                 </div>
               </div>
 
@@ -61,7 +68,7 @@
                 </div>
                 <div class="col-6 col-sm-4">
                   <label class="form-label small" for="calcCustoEmbalagem">Embalagem (R$)</label>
-                  <input type="number" step="0.01" min="0" class="form-control form-control-sm" id="calcCustoEmbalagem" value="1.00" required>
+                  <input type="number" step="0.01" min="0" class="form-control form-control-sm" id="calcCustoEmbalagem" value="0.50" required>
                 </div>
                 <div class="col-12 col-sm-4">
                   <label class="form-label small" for="calcCustoOperacional">Custo operacional (R$)</label>
@@ -73,10 +80,10 @@
                 <div class="col-12 col-sm-4">
                   <label class="form-label small" for="calcLucro">Lucro desejado</label>
                   <div class="input-group">
-                    <input type="number" step="0.01" min="0" class="form-control" id="calcLucro" value="0" required>
+                    <input type="number" step="0.01" min="0" class="form-control" id="calcLucro" value="30" required>
                     <select class="form-select sa-lucro-tipo-select" id="calcLucroTipo" aria-label="Tipo do lucro: reais ou percentual">
-                      <option value="valor" selected>R$</option>
-                      <option value="percentual">%</option>
+                      <option value="valor">R$</option>
+                      <option value="percentual" selected>%</option>
                     </select>
                   </div>
                 </div>
@@ -90,7 +97,19 @@
                 </div>
               </div>
 
-              <div class="d-flex gap-2">
+              <div class="mb-3">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="calcAutoAjustarTaxa" checked>
+                  <label class="form-check-label small text-muted" for="calcAutoAjustarTaxa">
+                    Ajustar taxas automaticamente pelas faixas de preço
+                  </label>
+                </div>
+                <div id="lojaFaixasContainer" class="mt-2">
+                  <!-- Badges/faixas serão renderizadas aqui -->
+                </div>
+              </div>
+
+              <div class="d-flex gap-2 mt-auto pt-3">
                 <button type="submit" class="btn btn-primary btn-sm flex-fill">
                   <i class="bi bi-calculator me-1"></i>Calcular
                 </button>
@@ -102,14 +121,40 @@
           </div>
         </div>
 
-        <div class="col-12 col-lg-6 d-flex" id="resultadoCard">
+        <div class="col-12 col-lg-6 d-flex flex-column" id="resultadoCard">
           <div class="card-sa flex-fill">
             <h2 class="h6 mb-2">Resultado</h2>
+
+            <!-- Comparativo de múltiplos canais -->
+            <div id="resultadoMultiploWrapper" class="mb-3 d-none">
+              <span class="text-muted small fw-semibold mb-2 d-block">Comparativo dos Canais Selecionados:</span>
+              <div class="table-responsive border rounded p-1 mb-2 bg-light bg-opacity-10">
+                <table class="table table-sm table-sa mb-0" style="font-size: 0.8rem;">
+                  <thead>
+                    <tr>
+                      <th>Loja</th>
+                      <th class="text-end">Preço Sugerido</th>
+                      <th class="text-end">Lucro R$</th>
+                      <th class="text-end">Recebe Líquido</th>
+                    </tr>
+                  </thead>
+                  <tbody id="resultadoMultiploTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+
             <table class="table table-sa table-resultado mb-0">
               <tbody>
                 <tr>
                   <td class="fw-semibold">Preço de venda sugerido</td>
-                  <td class="text-end fw-bold sa-preco-destaque" id="resPrecoVenda">—</td>
+                  <td class="text-end fw-bold sa-preco-destaque">
+                    <div class="d-flex align-items-center justify-content-end gap-2">
+                      <span id="resPrecoVenda">—</span>
+                      <button type="button" class="btn btn-sm btn-link p-0 text-muted d-none" id="btnCopiarPreco" title="Copiar preço" aria-label="Copiar preço sugerido">
+                        <i class="bi bi-clipboard"></i>
+                      </button>
+                    </div>
+                  </td>
                 </tr>
                 <tr><td>Custo do produto</td><td class="text-end" id="resCustoProduto">—</td></tr>
                 <tr><td>Embalagem</td><td class="text-end" id="resEmbalagem">—</td></tr>
@@ -118,14 +163,42 @@
                 <tr><td>Taxa fixa da loja</td><td class="text-end" id="resTaxaFixa">—</td></tr>
                 <tr><td>Taxa percentual da loja (sobre o preço de venda)</td><td class="text-end" id="resTaxaPercentual">—</td></tr>
                 <tr class="fw-semibold"><td>Valor líquido que você recebe (conferência)</td><td class="text-end" id="resLiquido">—</td></tr>
-              </tbody>
             </table>
+
+            <div id="comparacaoPrecoWrapper" class="mt-3 p-3 rounded" style="background-color: var(--sa-bg); border: 1px solid var(--sa-border); min-height: 110px;">
+              <div class="text-center text-muted py-2 small">
+                <i class="bi bi-info-circle me-1"></i> Preencha o "Preço de referência" para comparar a competitividade do seu preço sugerido.
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       <div class="card-sa mt-4">
-        <h2 class="h6 mb-3">Histórico de cálculos salvos</h2>
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-3 gap-2">
+          <div class="d-flex flex-column gap-1">
+            <h2 class="h6 mb-0">Histórico de cálculos salvos</h2>
+            <span class="text-muted small" id="historicoContador">Carregando produtos...</span>
+          </div>
+          <div class="d-flex flex-wrap gap-2 align-items-center w-100 w-md-auto justify-content-md-end">
+            <!-- Selector para itens por página -->
+            <div class="d-flex align-items-center gap-1">
+              <span class="text-muted small text-nowrap">Mostrar:</span>
+              <select class="form-select form-select-sm" id="historicoItensPorPagina" style="width: 80px;">
+                <option value="5">5</option>
+                <option value="10" selected>10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+              </select>
+            </div>
+            <!-- Filtro de Lojas -->
+            <div style="min-width: 150px;">
+              <select class="form-select form-select-sm" id="filtroHistoricoLoja">
+                <option value="">Todas as lojas</option>
+              </select>
+            </div>
+          </div>
+        </div>
         <div class="table-responsive table-list-min">
           <table class="table table-sa">
             <thead>
@@ -133,6 +206,17 @@
             </thead>
             <tbody id="historicoTableBody"></tbody>
           </table>
+        </div>
+
+        <!-- Rodapé de Navegação / Paginação -->
+        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-center mt-3 gap-2 d-none" id="historicoPaginacaoWrapper">
+          <span class="text-muted small" id="historicoInfoPaginacao">Página 1 de 1</span>
+          <nav aria-label="Navegação do histórico">
+            <ul class="pagination pagination-sm mb-0">
+              <li class="page-item" id="btnPaginaAnterior"><button class="page-link" type="button">Anterior</button></li>
+              <li class="page-item" id="btnPaginaProxima"><button class="page-link" type="button">Próxima</button></li>
+            </ul>
+          </nav>
         </div>
       </div>
   </main>
@@ -201,11 +285,21 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
       </div>
       <div class="modal-body">
+        <!-- Abas para alternar a loja visualizada no modal -->
+        <ul class="nav nav-pills nav-fill bg-light p-1 rounded mb-3 d-none" id="verCalculoTabs" style="font-size: 0.75rem;"></ul>
+
         <table class="table table-sa table-sm mb-0">
           <tbody>
             <tr>
               <td class="fw-semibold">Preço de venda sugerido</td>
-              <td class="text-end fw-bold sa-preco-destaque-sm" id="verPrecoVenda">—</td>
+              <td class="text-end fw-bold">
+                <div class="d-flex align-items-center justify-content-end gap-2">
+                  <span id="verPrecoVenda">—</span>
+                  <button type="button" class="btn btn-sm btn-link p-0 text-muted" id="btnCopiarPrecoModal" title="Copiar preço" aria-label="Copiar preço sugerido">
+                    <i class="bi bi-clipboard"></i>
+                  </button>
+                </div>
+              </td>
             </tr>
             <tr><td>Loja</td><td class="text-end" id="verLoja">—</td></tr>
             <tr><td>Custo do produto</td><td class="text-end" id="verCustoProduto">—</td></tr>
@@ -214,9 +308,22 @@
             <tr><td>Lucro desejado</td><td class="text-end" id="verLucro">—</td></tr>
             <tr><td>Taxa fixa da loja</td><td class="text-end" id="verTaxaFixa">—</td></tr>
             <tr><td>Taxa percentual da loja</td><td class="text-end" id="verTaxaPercentual">—</td></tr>
+            <tr id="verPrecoReferenciaRow" class="d-none"><td>Preço de referência</td><td class="text-end" id="verPrecoReferencia">—</td></tr>
+            <tr id="verDiferencaRow" class="d-none"><td>Diferença concorrente</td><td class="text-end" id="verDiferenca">—</td></tr>
           </tbody>
         </table>
         <div class="mt-3 d-flex gap-2 flex-wrap" id="verLinksWrapper"></div>
+      </div>
+      <div class="modal-footer d-flex justify-content-between align-items-center">
+        <button type="button" class="btn btn-sm btn-outline-danger" id="btnExcluirItemModal" title="Excluir esta precificação" aria-label="Excluir esta precificação">
+          <i class="bi bi-trash"></i>
+        </button>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-sm btn-primary" id="btnCopiarComoModelo">
+            <i class="bi bi-copy me-1"></i>Usar como modelo (Recalcular)
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Fechar</button>
+        </div>
       </div>
     </div>
   </div>

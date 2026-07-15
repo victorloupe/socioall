@@ -95,58 +95,54 @@ if (empresaForm) {
   empresaForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const btn = document.getElementById("empresaSubmitBtn");
-    const originalText = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = "Salvando...";
 
     try {
-      const nome = document.getElementById("empresaNomeInput").value.trim();
-      const site = document.getElementById("empresaSite").value.trim();
-      const endereco = document.getElementById("empresaEndereco").value.trim();
-      const cnpj = document.getElementById("empresaCnpj").value.trim();
-      const telefone = document.getElementById("empresaTelefone").value.trim();
-      const emailContato = document.getElementById("empresaEmailContato").value.trim();
-      const fileInput = document.getElementById("empresaLogoInput");
-      const file = fileInput.files[0];
+      await withLoadingButton(btn, "Salvando...", async () => {
+        const nome = document.getElementById("empresaNomeInput").value.trim();
+        const site = document.getElementById("empresaSite").value.trim();
+        const endereco = document.getElementById("empresaEndereco").value.trim();
+        const cnpj = document.getElementById("empresaCnpj").value.trim();
+        const telefone = document.getElementById("empresaTelefone").value.trim();
+        const emailContato = document.getElementById("empresaEmailContato").value.trim();
+        const fileInput = document.getElementById("empresaLogoInput");
+        const file = fileInput.files[0];
 
-      // Campos "core" (presentes desde a primeira versão do schema) — sempre devem poder ser salvos.
-      const update = { nome, site: site || null, endereco: endereco || null };
+        // Campos "core" (presentes desde a primeira versão do schema) — sempre devem poder ser salvos.
+        const update = { nome, site: site || null, endereco: endereco || null };
 
-      if (file) {
-        update.logo_url = await uploadLogo(file);
-      }
+        if (file) {
+          update.logo_url = await uploadLogo(file);
+        }
 
-      const { error } = await supabaseClient
-        .from("empresas")
-        .update(update)
-        .eq("id", currentEmpresaId);
+        const { error } = await supabaseClient
+          .from("empresas")
+          .update(update)
+          .eq("id", currentEmpresaId);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      if (update.logo_url) renderLogoPreview(update.logo_url);
-      fileInput.value = "";
+        if (update.logo_url) renderLogoPreview(update.logo_url);
+        fileInput.value = "";
 
-      // Campos extras (cnpj/telefone/email_contato, sql/schema_completo.sql) — salvos à
-      // parte de propósito: se essa migração ainda não rodou, o resto dos dados acima já
-      // foi salvo normalmente.
-      const { error: extrasError } = await supabaseClient
-        .from("empresas")
-        .update({ cnpj: cnpj || null, telefone: telefone || null, email_contato: emailContato || null })
-        .eq("id", currentEmpresaId);
+        // Campos extras (cnpj/telefone/email_contato, sql/schema_completo.sql) — salvos à
+        // parte de propósito: se essa migração ainda não rodou, o resto dos dados acima já
+        // foi salvo normalmente.
+        const { error: extrasError } = await supabaseClient
+          .from("empresas")
+          .update({ cnpj: cnpj || null, telefone: telefone || null, email_contato: emailContato || null })
+          .eq("id", currentEmpresaId);
 
-      if (extrasError) {
-        showToast("Nome/site/endereço/logo foram salvos. CNPJ/telefone/e-mail não — rode sql/schema_completo.sql no Supabase.", "warning");
-      } else {
-        showToast("Dados da empresa atualizados.");
-      }
+        if (extrasError) {
+          showToast("Nome/site/endereço/logo foram salvos. CNPJ/telefone/e-mail não — rode sql/schema_completo.sql no Supabase.", "warning");
+        } else {
+          showToast("Dados da empresa atualizados.");
+        }
 
-      // Atualiza o nome/logo já visíveis no menu lateral, sem precisar recarregar.
-      document.getElementById("empresaNome").textContent = nome;
+        // Atualiza o nome/logo já visíveis no menu lateral, sem precisar recarregar.
+        document.getElementById("empresaNome").textContent = nome;
+      });
     } catch (err) {
       showToast(friendlyErrorMessage(err, "Não foi possível salvar os dados da empresa."), "error");
-    } finally {
-      btn.disabled = false;
-      btn.textContent = originalText;
     }
   });
 }
@@ -281,38 +277,34 @@ if (novoSocioForm) {
   novoSocioForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const submitBtn = document.getElementById("socioSubmitBtn");
-    const originalText = submitBtn.textContent;
-    submitBtn.disabled = true;
-    submitBtn.textContent = "Salvando...";
 
     try {
-      const editId = document.getElementById("socioEditId").value;
-      const nome = document.getElementById("socioNome").value.trim();
-      const email = usernameToEmail(document.getElementById("socioEmail").value.trim());
-      const percentual = parseFloat(document.getElementById("socioPercentual").value);
+      await withLoadingButton(submitBtn, "Salvando...", async () => {
+        const editId = document.getElementById("socioEditId").value;
+        const nome = document.getElementById("socioNome").value.trim();
+        const email = usernameToEmail(document.getElementById("socioEmail").value.trim());
+        const percentual = parseFloat(document.getElementById("socioPercentual").value);
 
-      let error;
-      if (editId) {
-        ({ error } = await supabaseClient.from("socios").update({ nome, email, percentual }).eq("id", editId));
-      } else {
-        ({ error } = await supabaseClient.from("socios").insert({
-          empresa_id: currentEmpresaId,
-          nome,
-          email,
-          percentual
-        }));
-      }
+        let error;
+        if (editId) {
+          ({ error } = await supabaseClient.from("socios").update({ nome, email, percentual }).eq("id", editId));
+        } else {
+          ({ error } = await supabaseClient.from("socios").insert({
+            empresa_id: currentEmpresaId,
+            nome,
+            email,
+            percentual
+          }));
+        }
 
-      if (error) throw error;
+        if (error) throw error;
 
-      bootstrap.Modal.getInstance(document.getElementById("novoSocioModal")).hide();
-      showToast(editId ? "Sócio atualizado." : "Sócio adicionado.");
-      await loadSocios();
+        bootstrap.Modal.getInstance(document.getElementById("novoSocioModal")).hide();
+        showToast(editId ? "Sócio atualizado." : "Sócio adicionado.");
+        await loadSocios();
+      });
     } catch (err) {
       showToast(friendlyErrorMessage(err, "Não foi possível salvar o sócio."), "error");
-    } finally {
-      submitBtn.disabled = false;
-      submitBtn.textContent = originalText;
     }
   });
 }
@@ -335,7 +327,6 @@ if (resetSenhaSocioForm) {
   resetSenhaSocioForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const submitBtn = document.getElementById("resetSenhaSubmitBtn");
-    const originalText = submitBtn.textContent;
 
     const novaSenha = document.getElementById("resetSenhaNova").value;
     const confirmaSenha = document.getElementById("resetSenhaConfirma").value;
@@ -345,35 +336,31 @@ if (resetSenhaSocioForm) {
       return;
     }
 
-    submitBtn.disabled = true;
-    submitBtn.textContent = "Redefinindo...";
-
     try {
-      const { data: { session } } = await supabaseClient.auth.getSession();
-      const targetSocioId = document.getElementById("resetSenhaSocioId").value;
+      await withLoadingButton(submitBtn, "Redefinindo...", async () => {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        const targetSocioId = document.getElementById("resetSenhaSocioId").value;
 
-      const resp = await fetch("/api/reset-senha-socio", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({ targetSocioId, novaSenha })
+        const resp = await fetch("/api/reset-senha-socio", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({ targetSocioId, novaSenha })
+        });
+
+        const result = await resp.json().catch(() => ({}));
+
+        if (!resp.ok) {
+          throw new Error(result.error || "Não foi possível redefinir a senha.");
+        }
+
+        bootstrap.Modal.getInstance(document.getElementById("resetSenhaModal")).hide();
+        showToast("Senha redefinida com sucesso.");
       });
-
-      const result = await resp.json().catch(() => ({}));
-
-      if (!resp.ok) {
-        throw new Error(result.error || "Não foi possível redefinir a senha.");
-      }
-
-      bootstrap.Modal.getInstance(document.getElementById("resetSenhaModal")).hide();
-      showToast("Senha redefinida com sucesso.");
     } catch (err) {
       showToast(err.message || "Não foi possível redefinir a senha.", "error");
-    } finally {
-      submitBtn.disabled = false;
-      submitBtn.textContent = originalText;
     }
   });
 }

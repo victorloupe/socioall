@@ -505,6 +505,12 @@ h1, h2, h3, .h4, .h6 {
     gap: 8px;
     padding: 14px 6px;
   }
+
+  .sidebar-col.collapsed .sidebar-theme-toggle-row {
+    justify-content: center !important;
+    padding: 8px 0 !important;
+    border-bottom: none !important;
+  }
 }
 
 /* ---------- Responsive Viewports ---------- */
@@ -1519,4 +1525,151 @@ h1, h2, h3, .h4, .h6 {
 .alert-warning {
   background-color: #FFFBEB;
   color: #92400E;
+}
+
+/* ---------- Fee Brackets / Faixas de Preço ---------- */
+
+.faixas-item-btn {
+  border: 1px solid var(--sa-border);
+  background-color: var(--sa-bg-card);
+  color: var(--sa-text-secondary);
+  border-radius: 6px;
+  transition: all 0.2s ease-in-out;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.faixas-item-btn:hover {
+  border-color: var(--sa-primary);
+  color: var(--sa-primary);
+  background-color: rgba(7, 33, 80, 0.05);
+}
+
+.faixas-item-btn.active {
+  border-color: var(--sa-primary);
+  background-color: var(--sa-primary);
+  color: #ffffff !important;
+  box-shadow: 0 2px 4px rgba(7, 33, 80, 0.15);
+}
+
+.faixas-item-btn.active span {
+  color: #ffffff !important;
+}
+
+#lojaFaixasContainer {
+  min-height: 110px;
+  height: 110px;
+  display: block;
+}
+
+/* ---------- Dark Theme Overrides ---------- */
+
+html.dark-theme {
+  --sa-primary: #3B82F6;
+  --sa-primary-dark: #60A5FA;
+  --sa-text: #F8FAFC;
+  --sa-text-secondary: #94A3B8;
+  --sa-bg: #0B1329;
+  --sa-card: #131C35;
+  --sa-border: #222F54;
+  --sa-teal-light: #153E42;
+  --sa-teal-dark: #2DD4BF;
+  --sa-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --sa-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  background-color: var(--sa-bg);
+  color: var(--sa-text);
+}
+
+html.dark-theme body {
+  background-color: var(--sa-bg);
+  color: var(--sa-text);
+}
+
+html.dark-theme .sidebar-header {
+  background-color: rgba(19, 28, 53, 0.6);
+}
+
+html.dark-theme .form-control,
+html.dark-theme .form-select {
+  background-color: #1C284C;
+  border-color: #2D3D6F;
+  color: #F8FAFC;
+}
+
+html.dark-theme .form-control::placeholder {
+  color: #64748B;
+}
+
+html.dark-theme .form-control:focus,
+html.dark-theme .form-select:focus {
+  background-color: #1C284C;
+  color: #F8FAFC;
+  border-color: #3B82F6;
+  box-shadow: 0 0 0 0.25rem rgba(59, 130, 246, 0.25);
+}
+
+html.dark-theme .form-control:disabled,
+html.dark-theme .form-select:disabled {
+  background-color: #131C35;
+  color: #64748B;
+}
+
+html.dark-theme .table {
+  --bs-table-color: var(--sa-text);
+  --bs-table-bg: transparent;
+  --bs-table-border-color: var(--sa-border);
+}
+
+html.dark-theme .table-sa tbody tr:hover {
+  background-color: rgba(255, 255, 255, 0.02) !important;
+}
+
+html.dark-theme .modal-content {
+  background-color: var(--sa-card);
+  border-color: var(--sa-border);
+  color: var(--sa-text);
+}
+
+html.dark-theme .modal-header {
+  border-bottom-color: var(--sa-border);
+}
+
+html.dark-theme .modal-footer {
+  border-top-color: var(--sa-border);
+}
+
+html.dark-theme .btn-close {
+  filter: invert(1);
+}
+
+html.dark-theme ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+html.dark-theme ::-webkit-scrollbar-track {
+  background: var(--sa-bg);
+}
+
+html.dark-theme ::-webkit-scrollbar-thumb {
+  background: var(--sa-border);
+  border-radius: 4px;
+}
+
+/* Dark mode theme toggle button styling */
+.theme-toggle-btn {
+  background: none;
+  border: none;
+  color: var(--sa-text-secondary);
+  font-size: 1.15rem;
+  padding: 4px;
+  cursor: pointer;
+  transition: color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.theme-toggle-btn:hover {
+  color: var(--sa-teal);
 }

@@ -418,6 +418,7 @@ create table if not exists calculos_preco (
   nome_produto text not null,
   link_venda text,
   link_referencia text,
+  preco_referencia numeric(12,2),
   custo_produto numeric(12,2) not null default 0,
   custo_embalagem numeric(12,2) not null default 1,
   custo_operacional numeric(12,2) not null default 0,
@@ -427,6 +428,8 @@ create table if not exists calculos_preco (
   preco_venda numeric(12,2) not null default 0,
   created_at timestamptz default now()
 );
+
+alter table calculos_preco add column if not exists preco_referencia numeric(12,2);
 
 alter table calculos_preco enable row level security;
 grant select, insert, update, delete on calculos_preco to authenticated;
@@ -480,10 +483,12 @@ begin
 
   insert into lojas_ecommerce (empresa_id, nome, taxa_percentual, taxa_fixa, observacoes)
   values
-    (p_empresa_id, 'Mercado Livre', 12, 6,
-     'Anúncio Clássico: 10–14%. Premium: 15–19%. Produtos até R$79 pagam também custo fixo por unidade (~R$5,50–R$6,00+). Confira a taxa exata da categoria do seu produto no Seller Center.'),
     (p_empresa_id, 'Shopee', 14, 20,
      'Taxa por faixa de preço (vendedor CNPJ): até R$79,99 = 20%+R$4; R$80–99,99 = 14%+R$16; R$100–199,99 = 14%+R$20; acima de R$200 = 14%+R$26. Ajuste conforme a faixa do seu produto.'),
+    (p_empresa_id, 'TikTok Shop', 12, 6,
+     'Taxa por faixa de preço: até R$49,99 = 16% (sem taxa fixa); a partir de R$50,00 = 12%+R$6,00. Valores já incluem 6% do programa de frete grátis. Ajuste conforme a sua conta.'),
+    (p_empresa_id, 'Mercado Livre', 12, 6,
+     'Anúncio Clássico: 10–14%. Premium: 15–19%. Produtos até R$79 pagam também custo fixo por unidade (~R$5,50–R$6,00+). Confira a taxa exata da categoria do seu produto no Seller Center.'),
     (p_empresa_id, 'Amazon', 15, 0,
      'Taxa de referência entre 8% e 15% conforme a categoria (pode chegar a 20% em algumas categorias específicas). Confira a categoria exata no Seller Central.')
   on conflict (empresa_id, lower(nome)) do nothing;
