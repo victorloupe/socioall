@@ -137,9 +137,9 @@ function renderLojaTabs() {
     return `
       <li class="nav-item position-relative" role="presentation">
         <span class="position-absolute start-0 top-50 translate-middle-y ps-2" style="z-index: 5;">
-          <input type="checkbox" class="form-check-input sa-loja-checkbox" data-loja-id="${a.id}" ${isChecked ? "checked" : ""} style="width: 14px; height: 14px; margin-top: 0; cursor: pointer;">
+          <input type="checkbox" class="form-check-input sa-loja-checkbox" data-loja-id="${a.id}" ${isChecked ? "checked" : ""} style="width: 14px; height: 14px; margin: 0; cursor: pointer;">
         </span>
-        <button type="button" class="nav-link ${a.id === selectedLojaId ? "active" : ""}" style="padding-left: 28px;" data-loja-id="${a.id}" role="tab" aria-selected="${a.id === selectedLojaId}">
+        <button type="button" class="nav-link ${a.id === selectedLojaId ? "active" : ""}" style="padding-left: 36px !important;" data-loja-id="${a.id}" role="tab" aria-selected="${a.id === selectedLojaId}">
           ${escapeHtml(a.nome)}
         </button>
       </li>
