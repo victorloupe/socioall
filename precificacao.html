@@ -11,6 +11,8 @@
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://jgazcgtrkqbuzticrktr.supabase.co" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 <link rel="icon" type="image/png" href="logo-icon.png">
@@ -37,7 +39,11 @@
             <form id="calculadoraForm" class="d-flex flex-column flex-fill">
               <div class="mb-2">
                 <label class="form-label small" for="calcNomeProduto">Nome do produto</label>
-                <input type="text" class="form-control form-control-sm" id="calcNomeProduto" required>
+                <div class="position-relative" id="produtoSugestoesWrapper">
+                  <input type="text" class="form-control form-control-sm" id="calcNomeProduto" required autocomplete="off">
+                  <div class="dropdown-menu w-100 shadow-sm" id="produtoSugestoes" style="max-height: 240px; overflow-y: auto;"></div>
+                </div>
+                <div class="small mt-1 d-none" id="produtoExistenteHint"></div>
               </div>
 
               <div class="row g-2 mb-2">
@@ -181,6 +187,11 @@
             <span class="text-muted small" id="historicoContador">Carregando produtos...</span>
           </div>
           <div class="d-flex flex-wrap gap-2 align-items-center w-100 w-md-auto justify-content-md-end">
+            <!-- Busca no histórico -->
+            <div class="position-relative flex-grow-1" style="min-width: 260px; max-width: 420px;">
+              <i class="bi bi-search position-absolute top-50 translate-middle-y ms-2 text-muted" style="font-size: 0.85rem;"></i>
+              <input type="search" class="form-control ps-4" id="historicoBusca" placeholder="Buscar produto..." autocomplete="off">
+            </div>
             <!-- Selector para itens por página -->
             <div class="d-flex align-items-center gap-1">
               <span class="text-muted small text-nowrap">Mostrar:</span>
@@ -331,9 +342,9 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/common.js"></script>
+<script src="js/common.js?v=2"></script>
 <script src="js/supabaseClient.js"></script>
 <script src="js/page-helpers.js"></script>
-<script src="js/precificacao.js?v=4"></script>
+<script src="js/precificacao.js?v=8"></script>
 </body>
 </html>

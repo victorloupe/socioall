@@ -10,6 +10,7 @@ let selectedLojaId = "";
 let historicoPaginaAtual = 0;
 let historicoItensPorPagina = 10;
 let historicoGruposOrdenados = [];
+let historicoBuscaTermo = "";
 
 async function initPrecificacao() {
   const ctx = await initAuthenticatedPage('precificacao');
@@ -18,8 +19,33 @@ async function initPrecificacao() {
   currentSocioId = ctx.socioId;
 
   document.getElementById("filtroHistoricoLoja")?.addEventListener("change", () => {
+    // O filtro de loja é aplicado na tela (client-side): o cache completo
+    // continua intacto para as sugestões e o aviso de produto duplicado.
     historicoPaginaAtual = 0;
-    loadHistorico();
+    renderHistoricoPagina();
+  });
+
+  document.getElementById("historicoBusca")?.addEventListener("input", (e) => {
+    historicoBuscaTermo = e.target.value.trim().toLowerCase();
+    historicoPaginaAtual = 0;
+    renderHistoricoPagina();
+  });
+
+  let nomeProdutoBuscaTimeout;
+  document.getElementById("calcNomeProduto")?.addEventListener("input", (e) => {
+    clearTimeout(nomeProdutoBuscaTimeout);
+    nomeProdutoBuscaTimeout = setTimeout(() => {
+      const termo = e.target.value.trim().toLowerCase();
+      atualizarHintProdutoExistente(termo);
+      renderSugestoesProduto(termo);
+    }, 300);
+  });
+
+  // Fecha as sugestões ao clicar fora do campo
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest("#produtoSugestoesWrapper")) {
+      document.getElementById("produtoSugestoes")?.classList.remove("show");
+    }
   });
 
   document.getElementById("historicoItensPorPagina")?.addEventListener("change", (e) => {
@@ -36,7 +62,7 @@ async function initPrecificacao() {
   });
 
   document.getElementById("btnPaginaProxima")?.addEventListener("click", () => {
-    const totalPaginas = Math.ceil(historicoGruposOrdenados.length / historicoItensPorPagina);
+    const totalPaginas = Math.ceil(getGruposFiltrados().length / historicoItensPorPagina);
     if (historicoPaginaAtual < totalPaginas - 1) {
       historicoPaginaAtual++;
       renderHistoricoPagina();
@@ -308,7 +334,7 @@ function renderLojasTable() {
     const atualizadoEm = l.updated_at || l.created_at;
     const dias = atualizadoEm ? Math.floor((Date.now() - new Date(atualizadoEm).getTime()) / 86400000) : null;
     const desatualizada = dias !== null && dias > DIAS_PARA_REVISAR;
-    const atualizadoTexto = atualizadoEm ? formatDate(atualizadoEm.slice(0, 10)) : "—";
+    const atualizadoTexto = formatTimestamp(atualizadoEm);
 
     // data-label alimenta o rótulo de cada campo quando a tabela vira "cards"
     // empilhados no mobile (.table-stack-mobile, ver css/style.css) — no
@@ -704,6 +730,27 @@ document.getElementById("salvarCalculoBtn")?.addEventListener("click", async (e)
       nome_produto: nomeProduto
     }));
 
+    // Evita duplicados: remove registros anteriores do mesmo produto nas mesmas lojas
+    const lojaIdsToSave = recordsToInsert.map(r => r.loja_id);
+    const nomeNormalizado = nomeProduto.toLowerCase();
+    const { data: existentes } = await supabaseClient
+      .from("calculos_preco")
+      .select("id, nome_produto, loja_id")
+      .eq("empresa_id", currentEmpresaId)
+      .ilike("nome_produto", nomeProduto);
+
+    const idsParaExcluir = (existentes || [])
+      .filter(c => c.nome_produto.trim().toLowerCase() === nomeNormalizado && lojaIdsToSave.includes(c.loja_id))
+      .map(c => c.id);
+
+    if (idsParaExcluir.length > 0) {
+      const { error: deleteError } = await supabaseClient.from("calculos_preco").delete().in("id", idsParaExcluir);
+      if (deleteError) {
+        showToast(friendlyErrorMessage(deleteError, "Não foi possível atualizar o cadastro existente."), "error");
+        return;
+      }
+    }
+
     const { error } = await supabaseClient.from("calculos_preco").insert(recordsToInsert);
 
     if (error) {
@@ -711,9 +758,10 @@ document.getElementById("salvarCalculoBtn")?.addEventListener("click", async (e)
       return;
     }
 
-    showToast("Cálculo salvo no histórico.");
+    showToast(idsParaExcluir.length > 0 ? "Cadastro atualizado no histórico (registro anterior substituído)." : "Cálculo salvo no histórico.");
     btn.disabled = true;
     await loadHistorico();
+    atualizarHintProdutoExistente(nomeNormalizado);
   });
 });
 
@@ -734,20 +782,13 @@ function populateFiltroHistoricoLoja() {
 async function loadHistorico() {
   tableLoading("historicoTableBody", 5);
 
-  const filterVal = document.getElementById("filtroHistoricoLoja")?.value;
-  let query = supabaseClient
+  // Carrega o histórico completo (sem filtro de loja) — o filtro é aplicado
+  // na renderização. Assim as sugestões do nome do produto e o aviso de
+  // duplicado sempre enxergam todos os produtos cadastrados.
+  const { data, error } = await supabaseClient
     .from("calculos_preco")
-    .select("id, nome_produto, link_venda, link_referencia, preco_referencia, preco_venda, custo_produto, custo_embalagem, custo_operacional, lucro_desejado, taxa_percentual_usada, taxa_fixa_usada, created_at, lojas_ecommerce(id, nome)")
-    .eq("empresa_id", currentEmpresaId);
-
-  if (filterVal === "manual") {
-    query = query.is("loja_id", null);
-  } else if (filterVal) {
-    query = query.eq("loja_id", filterVal);
-  }
-
-  // Busca até 1000 registros para podermos agrupar em memória de forma consistente
-  const { data, error } = await query
+    .select("id, nome_produto, link_venda, link_referencia, preco_referencia, preco_venda, custo_produto, custo_embalagem, custo_operacional, lucro_desejado, taxa_percentual_usada, taxa_fixa_usada, loja_id, created_at, lojas_ecommerce(id, nome)")
+    .eq("empresa_id", currentEmpresaId)
     .order("created_at", { ascending: false })
     .limit(1000);
 
@@ -780,13 +821,121 @@ async function loadHistorico() {
   renderHistoricoPagina();
 }
 
+function getGruposFiltrados() {
+  let grupos = historicoGruposOrdenados;
+
+  // Filtro de loja (client-side): mantém só os itens da loja escolhida em
+  // cada grupo, e descarta grupos que ficarem vazios.
+  const lojaFiltro = document.getElementById("filtroHistoricoLoja")?.value || "";
+  if (lojaFiltro) {
+    grupos = grupos
+      .map(g => {
+        const items = g.items.filter(i => lojaFiltro === "manual" ? !i.loja_id : i.loja_id === lojaFiltro);
+        return items.length > 0 ? { ...g, items } : null;
+      })
+      .filter(Boolean);
+  }
+
+  if (historicoBuscaTermo) {
+    grupos = grupos.filter(g => g.nome_produto.toLowerCase().includes(historicoBuscaTermo));
+  }
+
+  return grupos;
+}
+
+function atualizarHintProdutoExistente(termo) {
+  const hint = document.getElementById("produtoExistenteHint");
+  if (!hint) return;
+  if (termo && groupedCalculosCache[termo]) {
+    hint.className = "small mt-1 text-warning";
+    hint.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i>Produto já cadastrado no histórico. Ao salvar, o cadastro anterior será substituído.';
+  } else {
+    hint.className = "small mt-1 d-none";
+    hint.innerHTML = "";
+  }
+}
+
+// Preenche o formulário da calculadora com os dados de um cálculo salvo
+function preencherFormularioComCalculo(c) {
+  document.getElementById("calcNomeProduto").value = c.nome_produto || "";
+  document.getElementById("calcLinkVenda").value = c.link_venda || "";
+  document.getElementById("calcLinkReferencia").value = c.link_referencia || "";
+  document.getElementById("calcPrecoReferencia").value = c.preco_referencia || "";
+  document.getElementById("calcCustoProduto").value = c.custo_produto || 0;
+  document.getElementById("calcCustoEmbalagem").value = c.custo_embalagem || 0;
+  document.getElementById("calcCustoOperacional").value = c.custo_operacional || 0;
+
+  // Recarrega o lucro como percentual (%) calculando a margem original
+  const custoBase = (c.custo_produto || 0) + (c.custo_embalagem || 0) + (c.custo_operacional || 0);
+  let lucroPct = 30;
+  if (custoBase > 0) {
+    lucroPct = Math.round((c.lucro_desejado / custoBase) * 100);
+  }
+  document.getElementById("calcLucro").value = lucroPct;
+  document.getElementById("calcLucroTipo").value = "percentual";
+
+  atualizarResultado();
+}
+
+// Dropdown de sugestões de produtos já cadastrados (autocomplete do nome do produto)
+function renderSugestoesProduto(termo) {
+  const box = document.getElementById("produtoSugestoes");
+  if (!box) return;
+
+  const matches = termo
+    ? historicoGruposOrdenados.filter(g => g.nome_produto.toLowerCase().includes(termo)).slice(0, 8)
+    : [];
+
+  if (matches.length === 0) {
+    box.classList.remove("show");
+    box.innerHTML = "";
+    return;
+  }
+
+  box.innerHTML = matches.map(g => {
+    const key = g.nome_produto.trim().toLowerCase();
+    const lojas = g.items.map(i => i.lojas_ecommerce?.nome || "Manual").join(", ");
+    return `
+      <button type="button" class="dropdown-item small d-flex justify-content-between align-items-center gap-2" data-sugestao-key="${escapeHtml(key)}">
+        <span class="text-truncate">${escapeHtml(g.nome_produto)}</span>
+        <span class="text-muted text-nowrap" style="font-size: 0.7rem;">${escapeHtml(lojas)}</span>
+      </button>
+    `;
+  }).join("");
+
+  box.querySelectorAll("[data-sugestao-key]").forEach(btn => {
+    btn.onclick = () => {
+      box.classList.remove("show");
+      usarSugestaoProduto(btn.dataset.sugestaoKey);
+    };
+  });
+
+  box.classList.add("show");
+}
+
+// Carrega o cálculo salvo da sugestão clicada como modelo no formulário
+function usarSugestaoProduto(key) {
+  const g = groupedCalculosCache[key];
+  if (!g || g.items.length === 0) return;
+
+  preencherFormularioComCalculo(g.items[0]);
+  atualizarHintProdutoExistente(key);
+
+  showToast(`Dados de "${g.nome_produto}" carregados como modelo.`);
+}
+
 function renderHistoricoPagina() {
-  const totalItens = historicoGruposOrdenados.length;
+  const gruposFiltrados = getGruposFiltrados();
+  const totalItens = gruposFiltrados.length;
   
   // Atualiza o contador de total de produtos
   const contador = document.getElementById("historicoContador");
   if (contador) {
-    contador.textContent = totalItens === 1 ? "1 produto cadastrado" : `${totalItens} produtos cadastrados`;
+    if (historicoBuscaTermo) {
+      contador.textContent = totalItens === 1 ? "1 produto encontrado" : `${totalItens} produtos encontrados`;
+    } else {
+      contador.textContent = totalItens === 1 ? "1 produto cadastrado" : `${totalItens} produtos cadastrados`;
+    }
   }
 
   const totalPaginas = Math.ceil(totalItens / historicoItensPorPagina) || 1;
@@ -811,7 +960,9 @@ function renderHistoricoPagina() {
   const btnProxima = document.getElementById("btnPaginaProxima");
 
   if (totalItens === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" class="table-empty"><i class="bi bi-clock-history fs-4 d-block mb-2"></i>Nenhum cálculo salvo ainda. Calcular sem clicar em "Salvar" não fica registrado aqui.</td></tr>';
+    tbody.innerHTML = historicoBuscaTermo
+      ? '<tr><td colspan="5" class="table-empty"><i class="bi bi-search fs-4 d-block mb-2"></i>Nenhum produto encontrado para esta busca.</td></tr>'
+      : '<tr><td colspan="5" class="table-empty"><i class="bi bi-clock-history fs-4 d-block mb-2"></i>Nenhum cálculo salvo ainda. Calcular sem clicar em "Salvar" não fica registrado aqui.</td></tr>';
     if (paginacaoWrapper) paginacaoWrapper.classList.add("d-none");
     return;
   }
@@ -828,7 +979,7 @@ function renderHistoricoPagina() {
     btnProxima.classList.toggle("disabled", historicoPaginaAtual === totalPaginas - 1);
   }
 
-  const itensPagina = historicoGruposOrdenados.slice(inicio, fim);
+  const itensPagina = gruposFiltrados.slice(inicio, fim);
 
   itensPagina.forEach(g => {
     const tr = document.createElement("tr");
@@ -855,7 +1006,7 @@ function renderHistoricoPagina() {
         <div class="mt-1 d-flex flex-wrap align-items-center gap-1">${storesHtml}</div>
       </td>
       <td colspan="2"><div class="d-flex flex-wrap py-1">${pricesHtml}</div></td>
-      <td>${formatDate(g.created_at.slice(0, 10))}</td>
+      <td>${formatTimestamp(g.created_at)}</td>
       <td class="text-end">
         <button type="button" class="btn btn-sm btn-outline-danger" aria-label="Excluir produto ${escapeHtml(g.nome_produto)}" onclick="event.stopPropagation(); excluirCalculoGrupo('${escapeHtml(g.nome_produto)}')"><i class="bi bi-trash"></i></button>
       </td>
@@ -946,28 +1097,12 @@ function verCalculoGrupo(key) {
     const btnCopiarComoModelo = document.getElementById("btnCopiarComoModelo");
     if (btnCopiarComoModelo) {
       btnCopiarComoModelo.onclick = () => {
-        document.getElementById("calcNomeProduto").value = c.nome_produto || "";
-        document.getElementById("calcLinkVenda").value = c.link_venda || "";
-        document.getElementById("calcLinkReferencia").value = c.link_referencia || "";
-        document.getElementById("calcPrecoReferencia").value = c.preco_referencia || "";
-        document.getElementById("calcCustoProduto").value = c.custo_produto || 0;
-        document.getElementById("calcCustoEmbalagem").value = c.custo_embalagem || 0;
-        document.getElementById("calcCustoOperacional").value = c.custo_operacional || 0;
-
-        // Recarrega o lucro como percentual (%) calculando a margem original
-        const custoBase = (c.custo_produto || 0) + (c.custo_embalagem || 0) + (c.custo_operacional || 0);
-        let lucroPct = 30;
-        if (custoBase > 0) {
-          lucroPct = Math.round((c.lucro_desejado / custoBase) * 100);
-        }
-        document.getElementById("calcLucro").value = lucroPct;
-        document.getElementById("calcLucroTipo").value = "percentual";
+        preencherFormularioComCalculo(c);
 
         const modalEl = document.getElementById("verCalculoModal");
         const modal = bootstrap.Modal.getInstance(modalEl) || bootstrap.Modal.getOrCreateInstance(modalEl);
         if (modal) modal.hide();
 
-        atualizarResultado();
         window.scrollTo({ top: 0, behavior: 'smooth' });
         showToast("Cálculo carregado como modelo! Altere a loja/aba se desejar recalcular.");
       };
