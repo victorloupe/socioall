@@ -232,3 +232,15 @@ function formatCurrency(value) {
 function formatDate(dateStr) {
   return new Date(dateStr + "T00:00:00").toLocaleDateString("pt-BR");
 }
+
+// Formata um timestamp completo (ex: created_at do banco, em UTC) convertendo
+// para o fuso horário local ANTES de extrair a data. Nunca use
+// formatDate(ts.slice(0, 10)) para timestamps: cortar a string pega a data em
+// UTC, e um registro salvo às 22h de Brasília aparecia com o dia seguinte.
+function formatTimestamp(ts, { comHora = false } = {}) {
+  if (!ts) return "—";
+  const d = new Date(ts);
+  const data = d.toLocaleDateString("pt-BR");
+  if (!comHora) return data;
+  return `${data} ${d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
+}

@@ -414,7 +414,7 @@ async function loadAuditLog() {
     const tr = document.createElement("tr");
     const acaoBadge = item.acao === "delete" ? "badge-despesa" : (item.acao === "insert" ? "badge-receita" : "");
     tr.innerHTML = `
-      <td class="small text-muted">${formatDate(item.created_at.slice(0, 10))} ${item.created_at.slice(11, 16)}</td>
+      <td class="small text-muted">${formatTimestamp(item.created_at, { comHora: true })}</td>
       <td>${escapeHtml(item.socios?.nome || "—")}</td>
       <td>${AUDIT_TABELA_LABEL[item.tabela] || escapeHtml(item.tabela)}: ${descreverAuditItem(item)}</td>
       <td>${acaoBadge ? `<span class="badge ${acaoBadge}">${AUDIT_ACAO_LABEL[item.acao] || item.acao}</span>` : (AUDIT_ACAO_LABEL[item.acao] || item.acao)}</td>

@@ -120,7 +120,7 @@ async function loadPedidos() {
       <td>${escapeHtml(p.lojas_ecommerce?.nome || "—")}</td>
       <td>${p.valor != null ? formatCurrency(p.valor) : "—"}</td>
       <td><span class="badge ${statusClass}">${statusLabel}</span></td>
-      <td>${p.created_at ? formatDate(p.created_at.slice(0, 10)) : "—"}</td>
+      <td>${formatTimestamp(p.created_at)}</td>
       <td class="text-end text-nowrap">
         ${p.status === "pendente" 
           ? `<button class="btn btn-sm btn-outline-success me-1" title="Faturar no Caixa" onclick="faturarPedido('${p.id}', this)"><i class="bi bi-currency-dollar"></i> Faturar</button>
