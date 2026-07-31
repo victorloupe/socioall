@@ -115,6 +115,25 @@
                 </div>
               </div>
 
+              <div class="mb-3 border-top pt-2">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="calcSimularPromo">
+                  <label class="form-check-label small text-muted fw-semibold" for="calcSimularPromo" style="cursor: pointer;">
+                    Simular preço promocional (Campanha / Desconto)
+                  </label>
+                </div>
+                <div id="calcPromoFields" class="row g-2 mt-1 d-none">
+                  <div class="col-6">
+                    <label class="form-label small mb-1" for="calcPromoDesconto">Desconto (%)</label>
+                    <input type="number" step="0.1" min="0" max="100" class="form-control form-control-sm" id="calcPromoDesconto" placeholder="Ex: 10">
+                  </div>
+                  <div class="col-6">
+                    <label class="form-label small mb-1" for="calcPromoPreco">Ou Preço Promocional (R$)</label>
+                    <input type="number" step="0.01" min="0" class="form-control form-control-sm" id="calcPromoPreco" placeholder="Ex: 48,00">
+                  </div>
+                </div>
+              </div>
+
               <div class="d-flex gap-2 mt-auto pt-3">
                 <button type="submit" class="btn btn-primary btn-sm flex-fill">
                   <i class="bi bi-calculator me-1"></i>Calcular

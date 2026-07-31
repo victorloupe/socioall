@@ -202,68 +202,37 @@ async function iniciarSincronizacao(event) {
   await finalizarSincronizacao(lojaId);
 }
 
-const MOCK_ORDERS_TEMPLATES = {
-  "mercado livre": [
-    { nome_produto: "Smartphone Xiaomi Redmi Note 13", prefixo: "ML", base_valor: 1199 },
-    { nome_produto: "Fone de Ouvido Bluetooth JBL Wave Flex", prefixo: "ML", base_valor: 249 },
-    { nome_produto: "Carregador Rápido USB-C 20W", prefixo: "ML", base_valor: 89 },
-    { nome_produto: "Cabo HDMI 2.0 4K UltraHD", prefixo: "ML", base_valor: 39 }
-  ],
-  "shopee": [
-    { nome_produto: "Garrafa Térmica Inox 1L com Sensor", prefixo: "SH", base_valor: 59 },
-    { nome_produto: "Kit 3 Camisetas Masculinas Dry Fit", prefixo: "SH", base_valor: 79 },
-    { nome_produto: "Mini Liquidificador Portátil USB", prefixo: "SH", base_valor: 45 },
-    { nome_produto: "Organizador de Cabos de Silicone", prefixo: "SH", base_valor: 15 }
-  ],
-  "amazon": [
-    { nome_produto: "Kindle 11ª Geração Black", prefixo: "AMZ", base_valor: 499 },
-    { nome_produto: "Smart Speaker Echo Pop Alexa", prefixo: "AMZ", base_valor: 349 },
-    { nome_produto: "Mouse Sem Fio Logitech Pebble", prefixo: "AMZ", base_valor: 129 },
-    { nome_produto: "Suporte Articulado para Notebook", prefixo: "AMZ", base_valor: 89 }
-  ]
-};
-
 async function finalizarSincronizacao(lojaId) {
   try {
-    const lojaObj = lojasCache.find(l => l.id === lojaId);
-    const lojaNome = (lojaObj?.nome || "").toLowerCase().trim();
-
-    let templates = MOCK_ORDERS_TEMPLATES[lojaNome];
-    if (!templates) {
-      // Fallback genérico caso criem uma loja nova
-      templates = [
-        { nome_produto: `Produto Importado ${lojaObj?.nome || "Loja"} A`, prefixo: "EC", base_valor: 120 },
-        { nome_produto: `Produto Importado ${lojaObj?.nome || "Loja"} B`, prefixo: "EC", base_valor: 85 }
-      ];
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) {
+      throw new Error("Sessão inválida. Por favor, faça login novamente.");
     }
 
-    const ordersToInsert = templates.map(t => {
-      const numPedido = `${t.prefixo}-${Math.floor(10000000 + Math.random() * 90000000)}`;
-      const valor = parseFloat((t.base_valor + (Math.random() - 0.5) * (t.base_valor * 0.1)).toFixed(2));
-      
-      // Datas aleatórias recentes (últimos 3 dias)
-      const dataOffset = Math.floor(Math.random() * 3);
-      const dataStr = new Date(Date.now() - dataOffset * 24 * 60 * 60 * 1000).toISOString();
-
-      return {
-        empresa_id: currentEmpresaId,
-        loja_id: lojaId,
-        numero_pedido: numPedido,
-        nome_produto: t.nome_produto,
-        valor: valor,
-        status: "pendente",
-        created_at: dataStr
-      };
+    const resp = await fetch("/api/sync-shopee", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify({ lojaId })
     });
 
-    const { error } = await supabaseClient
-      .from("pedidos_ecommerce")
-      .insert(ordersToInsert);
+    const result = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      throw new Error(result.error || "Erro na sincronização de dados.");
+    }
 
-    if (error) throw error;
-
-    showToast(`Sincronização com ${lojaObj?.nome || "loja"} finalizada. ${ordersToInsert.length} pedidos importados.`);
+    const lojaObj = lojasCache.find(l => l.id === lojaId);
+    const lojaNome = lojaObj?.nome || "loja";
     
+    // Se o backend rodou no modo de simulação, avisa no toast
+    const msgSucedida = result.mode === "simulation"
+      ? `Sincronização com ${lojaNome} simulada. ${result.importedCount} pedidos de teste criados.`
+      : `Sincronização com ${lojaNome} concluída. ${result.importedCount} pedidos importados da Shopee.`;
+
+    showToast(msgSucedida);
+
     // Oculta modal
     const modalEl = document.getElementById("sincronizarModal");
     if (modalEl) {
@@ -273,7 +242,7 @@ async function finalizarSincronizacao(lojaId) {
 
     await loadPedidos();
   } catch (err) {
-    showToast(friendlyErrorMessage(err, "Falha ao gravar os pedidos importados no banco de dados."), "error");
+    showToast(friendlyErrorMessage(err, "Falha ao sincronizar os pedidos da loja."), "error");
     // Libera botões caso dê erro para tentar de novo
     document.getElementById("btnConfirmSync").disabled = false;
     document.getElementById("btnFecharSyncModal").disabled = false;

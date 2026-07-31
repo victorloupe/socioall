@@ -402,6 +402,22 @@ async function excluirLancamento(id) {
   const ok = await confirmDialog("Excluir este lançamento? Essa ação não pode ser desfeita.", { confirmText: "Excluir" });
   if (!ok) return;
 
+  // Busca os caminhos dos comprovantes vinculados antes de excluir o lançamento,
+  // para podermos removê-los do Storage (evitando arquivos órfãos).
+  const { data: comprovantes, error: fetchError } = await supabaseClient
+    .from("lancamento_comprovantes")
+    .select("path")
+    .eq("lancamento_id", id);
+
+  if (!fetchError && comprovantes && comprovantes.length > 0) {
+    const paths = comprovantes.map(c => c.path);
+    // Remove do Storage (se falhar, não impede a exclusão no banco, mas loga)
+    const { error: storageError } = await supabaseClient.storage.from("comprovantes").remove(paths);
+    if (storageError) {
+      console.error("Falha ao remover comprovantes do Storage ao excluir lançamento:", storageError);
+    }
+  }
+
   const { error } = await supabaseClient.from("lancamentos").delete().eq("id", id);
   if (error) {
     showToast(friendlyErrorMessage(error, "Não foi possível excluir o lançamento."), "error");

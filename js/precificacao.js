@@ -69,8 +69,80 @@ async function initPrecificacao() {
     }
   });
 
+  document.getElementById("calcCompararCanais")?.addEventListener("change", (e) => {
+    const comparar = e.target.checked;
+    if (!comparar) {
+      selectedLojasIds = [selectedLojaId];
+    }
+    renderLojaTabs();
+    atualizarResultado();
+  });
+
+  const simularPromoCheckbox = document.getElementById("calcSimularPromo");
+  const promoFields = document.getElementById("calcPromoFields");
+  const inputPromoDesconto = document.getElementById("calcPromoDesconto");
+  const inputPromoPreco = document.getElementById("calcPromoPreco");
+
+  simularPromoCheckbox?.addEventListener("change", (e) => {
+    const ativa = e.target.checked;
+    if (ativa) {
+      promoFields?.classList.remove("d-none");
+    } else {
+      promoFields?.classList.add("d-none");
+      if (inputPromoDesconto) inputPromoDesconto.value = "";
+      if (inputPromoPreco) inputPromoPreco.value = "";
+    }
+    atualizarResultado();
+  });
+
+  let promoSincronizando = false;
+  inputPromoDesconto?.addEventListener("input", (e) => {
+    if (promoSincronizando) return;
+    promoSincronizando = true;
+    const desconto = Number(e.target.value) || 0;
+    const precoSugerido = obterPrecoSugeridoSemPromo();
+    if (precoSugerido > 0) {
+      const precoPromocional = precoSugerido * (1 - desconto / 100);
+      if (inputPromoPreco) inputPromoPreco.value = precoPromocional > 0 ? precoPromocional.toFixed(2) : "0";
+    }
+    promoSincronizando = false;
+    atualizarResultado();
+  });
+
+  inputPromoPreco?.addEventListener("input", (e) => {
+    if (promoSincronizando) return;
+    promoSincronizando = true;
+    const precoPromocional = Number(e.target.value) || 0;
+    const precoSugerido = obterPrecoSugeridoSemPromo();
+    if (precoSugerido > 0) {
+      const desconto = ((precoSugerido - precoPromocional) / precoSugerido) * 100;
+      if (inputPromoDesconto) inputPromoDesconto.value = desconto > 0 ? desconto.toFixed(1) : "0";
+    }
+    promoSincronizando = false;
+    atualizarResultado();
+  });
+
   await loadLojas();
   await loadHistorico();
+}
+
+function obterPrecoSugeridoSemPromo() {
+  const custoProduto = Number(document.getElementById("calcCustoProduto").value) || 0;
+  const custoEmbalagem = Number(document.getElementById("calcCustoEmbalagem").value) || 0;
+  const custoOperacional = Number(document.getElementById("calcCustoOperacional").value) || 0;
+  const lucroInput = Number(document.getElementById("calcLucro").value) || 0;
+  const lucroTipo = document.getElementById("calcLucroTipo").value;
+
+  const custoBase = custoProduto + custoEmbalagem + custoOperacional;
+  const lucro = lucroTipo === "percentual" ? custoBase * (lucroInput / 100) : lucroInput;
+
+  const taxaPercentual = Number(document.getElementById("calcTaxaPercentual").value) || 0;
+  const taxaFixa = Number(document.getElementById("calcTaxaFixa").value) || 0;
+
+  if (taxaPercentual >= 100) return 0;
+
+  const res = calcularPrecoVenda({ custoProduto, custoEmbalagem, custoOperacional, lucro, taxaPercentual, taxaFixa });
+  return res.precoVenda;
 }
 
 // ---------- Lojas / marketplaces ----------
@@ -149,6 +221,11 @@ function renderLojaTabs() {
     { id: "", nome: "Manual" }
   ];
 
+  const comparar = document.getElementById("calcCompararCanais")?.checked || false;
+  if (!comparar && selectedLojasIds.length > 1) {
+    selectedLojasIds = [selectedLojaId];
+  }
+
   if (!lojaTabsInicializado) {
     lojaTabsInicializado = true;
     const shopee = lojasCache.find(l => l.nome.trim().toLowerCase() === "shopee");
@@ -159,14 +236,29 @@ function renderLojaTabs() {
   }
 
   container.innerHTML = abas.map(a => {
-    const isSelected = selectedLojasIds.includes(a.id);
+    const isSelected = comparar ? selectedLojasIds.includes(a.id) : (a.id === selectedLojaId);
     const isActive = a.id === selectedLojaId;
 
     let btnClass = "btn btn-sm btn-outline-secondary"; // Não selecionado
-    if (isActive) {
-      btnClass = "btn btn-sm btn-primary shadow-sm"; // Selecionado + Focado/Ativo
-    } else if (isSelected) {
-      btnClass = "btn btn-sm btn-outline-primary bg-primary bg-opacity-10"; // Selecionado mas não focado
+    if (isActive || (isSelected && comparar)) {
+      const nameLower = a.nome.toLowerCase().trim();
+      if (nameLower.includes("shopee")) {
+        btnClass = "btn btn-sm btn-store-shopee shadow-sm";
+      } else if (nameLower.includes("tiktok")) {
+        btnClass = "btn btn-sm btn-store-tiktok shadow-sm";
+      } else if (nameLower.includes("amazon")) {
+        btnClass = "btn btn-sm btn-store-amazon shadow-sm";
+      } else if (nameLower.includes("mercado livre") || nameLower.includes("mercado_livre")) {
+        btnClass = "btn btn-sm btn-store-mercadolivre shadow-sm";
+      } else if (a.id === "") { // Manual
+        btnClass = "btn btn-sm btn-store-manual shadow-sm";
+      } else {
+        btnClass = "btn btn-sm btn-store-generic shadow-sm";
+      }
+
+      if (isSelected && !isActive && comparar) {
+        btnClass += " opacity-75";
+      }
     }
 
     return `
@@ -176,28 +268,33 @@ function renderLojaTabs() {
     `;
   }).join("");
 
-  // Vincula os listeners de click nos botões para a seleção de dupla ação
+  // Vincula os listeners de click nos botões para a seleção
   container.querySelectorAll("button[data-loja-id]").forEach(btn => {
     btn.addEventListener("click", (e) => {
       const id = e.currentTarget.dataset.lojaId;
-      const isSelected = selectedLojasIds.includes(id);
-      const isActive = id === selectedLojaId;
 
-      if (!isSelected) {
-        // Clica em um cinza: seleciona e foca (fica azul sólido)
-        selectedLojasIds.push(id);
+      if (!comparar) {
+        // Seleção simples (padrão): apenas um ativo por vez
         selectedLojaId = id;
-      } else if (isSelected && !isActive) {
-        // Clica em um azul claro: apenas foca ele (vira azul sólido)
-        selectedLojaId = id;
-      } else if (isSelected && isActive) {
-        // Clica no azul sólido (ativo): desmarca e volta a ficar cinza
-        selectedLojasIds = selectedLojasIds.filter(x => x !== id);
-        if (selectedLojasIds.length > 0) {
-          selectedLojaId = selectedLojasIds[selectedLojasIds.length - 1];
-        } else {
-          selectedLojaId = "";
-          selectedLojasIds = [""];
+        selectedLojasIds = [id];
+      } else {
+        // Seleção múltipla (comparação de canais)
+        const isSelected = selectedLojasIds.includes(id);
+        const isActive = id === selectedLojaId;
+
+        if (!isSelected) {
+          selectedLojasIds.push(id);
+          selectedLojaId = id;
+        } else if (isSelected && !isActive) {
+          selectedLojaId = id;
+        } else if (isSelected && isActive) {
+          selectedLojasIds = selectedLojasIds.filter(x => x !== id);
+          if (selectedLojasIds.length > 0) {
+            selectedLojaId = selectedLojasIds[selectedLojasIds.length - 1];
+          } else {
+            selectedLojaId = "";
+            selectedLojasIds = [""];
+          }
         }
       }
 
@@ -510,63 +607,124 @@ function atualizarResultado(faixaForcada) {
 
   const resultado = calcularPrecoVenda({ custoProduto, custoEmbalagem, custoOperacional, lucro, taxaPercentual, taxaFixa });
 
-  document.getElementById("resPrecoVenda").textContent = formatCurrency(resultado.precoVenda);
+  const simularPromo = document.getElementById("calcSimularPromo")?.checked || false;
+  const precoPromocional = Number(document.getElementById("calcPromoPreco")?.value) || 0;
+  
+  let resultadoFinal = { ...resultado };
+  let lucroFinal = lucro;
+  let liquidoFinal = resultado.liquido;
+
+  if (simularPromo && precoPromocional > 0) {
+    const valorTaxaPercentual = precoPromocional * (taxaPercentual / 100);
+    const liquidoPromo = precoPromocional - valorTaxaPercentual - taxaFixa - custoEmbalagem - custoOperacional;
+    const lucroPromo = liquidoPromo - custoProduto;
+    
+    resultadoFinal.precoVenda = precoPromocional;
+    resultadoFinal.valorTaxaPercentual = valorTaxaPercentual;
+    liquidoFinal = liquidoPromo;
+    lucroFinal = lucroPromo;
+  }
+
+  // Preenche os campos do card de resultados
+  const resPrecoVendaEl = document.getElementById("resPrecoVenda");
+  if (simularPromo && precoPromocional > 0) {
+    const descontoVal = Number(document.getElementById("calcPromoDesconto")?.value) || 0;
+    resPrecoVendaEl.innerHTML = `<span class="text-muted text-decoration-line-through small me-1">${formatCurrency(resultado.precoVenda)}</span> <span class="text-danger fw-bold">${formatCurrency(precoPromocional)}</span> <span class="badge bg-danger-subtle text-danger ms-1" style="font-size: 0.65rem;">${descontoVal.toFixed(1)}% OFF</span>`;
+  } else {
+    resPrecoVendaEl.innerHTML = `<span>${formatCurrency(resultado.precoVenda)}</span>`;
+  }
+
   document.getElementById("resCustoProduto").textContent = formatCurrency(custoProduto);
   document.getElementById("resEmbalagem").textContent = formatCurrency(custoEmbalagem);
   document.getElementById("resOperacional").textContent = formatCurrency(custoOperacional);
-  document.getElementById("resLucro").textContent = lucroTipo === "percentual"
-    ? `${lucroInput.toFixed(2)}% (${formatCurrency(lucro)})`
-    : formatCurrency(lucro);
+
+  const resLucroEl = document.getElementById("resLucro");
+  if (simularPromo && precoPromocional > 0) {
+    const originalLucroText = lucroTipo === "percentual" ? `${lucroInput.toFixed(2)}% (${formatCurrency(lucro)})` : formatCurrency(lucro);
+    const isPrejuizo = lucroFinal < 0;
+    const colorClass = isPrejuizo ? "text-danger" : "text-success";
+    resLucroEl.innerHTML = `<span class="text-muted text-decoration-line-through me-1">${originalLucroText}</span> <span class="${colorClass} fw-semibold">${formatCurrency(lucroFinal)}</span>`;
+  } else {
+    resLucroEl.innerHTML = lucroTipo === "percentual"
+      ? `<span>${lucroInput.toFixed(2)}% (${formatCurrency(lucro)})</span>`
+      : `<span>${formatCurrency(lucro)}</span>`;
+  }
+
   document.getElementById("resTaxaFixa").textContent = formatCurrency(taxaFixa);
-  document.getElementById("resTaxaPercentual").textContent = `${taxaPercentual.toFixed(2)}% (${formatCurrency(resultado.valorTaxaPercentual)})`;
-  document.getElementById("resLiquido").textContent = formatCurrency(resultado.liquido);
+  document.getElementById("resTaxaPercentual").textContent = `${taxaPercentual.toFixed(2)}% (${formatCurrency(resultadoFinal.valorTaxaPercentual)})`;
 
+  const resLiquidoEl = document.getElementById("resLiquido");
+  if (simularPromo && precoPromocional > 0) {
+    resLiquidoEl.innerHTML = `<span class="text-muted text-decoration-line-through me-1">${formatCurrency(resultado.liquido)}</span> <span class="fw-bold">${formatCurrency(liquidoFinal)}</span>`;
+  } else {
+    resLiquidoEl.innerHTML = `<span>${formatCurrency(resultado.liquido)}</span>`;
+  }
+
+  // Verifica se o lucro promocional gerou prejuízo e exibe alerta no compWrapper
   const precoReferencia = Number(document.getElementById("calcPrecoReferencia").value) || 0;
-
-  // Renderiza a comparação de preços do canal ativo
   const compWrapper = document.getElementById("comparacaoPrecoWrapper");
+  
   if (compWrapper) {
-    if (precoReferencia > 0) {
-      const precoVenda = resultado.precoVenda;
-      const diff = precoVenda - precoReferencia;
-      const diffPercent = (diff / precoReferencia) * 100;
-      
-      let badgeClass = "";
-      let badgeText = "";
-      let descText = "";
-      
-      if (diff < -0.01) {
-        badgeClass = "bg-success";
-        badgeText = "Abaixo da Referência";
-        descText = `Seu preço está <strong class="text-success">${formatCurrency(Math.abs(diff))} mais barato</strong> (${diffPercent.toFixed(1)}%) em relação ao concorrente.`;
-      } else if (Math.abs(diff) <= 0.01) {
-        badgeClass = "bg-warning text-dark";
-        badgeText = "Igual à Referência";
-        descText = `Seu preço está <strong>exatamente igual</strong> ao preço do concorrente.`;
-      } else {
-        badgeClass = "bg-danger";
-        badgeText = "Acima da Referência";
-        descText = `Seu preço está <strong class="text-danger">${formatCurrency(diff)} mais caro</strong> (+${diffPercent.toFixed(1)}%) que o concorrente.`;
-      }
-      
+    if (simularPromo && precoPromocional > 0 && lucroFinal < 0) {
       compWrapper.innerHTML = `
-        <div class="d-flex align-items-center justify-content-between">
-          <span class="small fw-semibold text-muted">Comparação (Canal Ativo)</span>
-          <span class="badge ${badgeClass}">${badgeText}</span>
+        <div class="d-flex align-items-center justify-content-between text-danger">
+          <span class="small fw-semibold"><i class="bi bi-exclamation-triangle-fill me-1"></i> Atenção: Prejuízo Detectado!</span>
         </div>
-        <div class="mt-2 small text-secondary">
-          Preço concorrente: <strong class="text-dark">${formatCurrency(precoReferencia)}</strong>
+        <div class="mt-2 small text-danger fw-semibold">
+          Esta promoção resulta em um prejuízo de ${formatCurrency(Math.abs(lucroFinal))} por unidade vendida!
         </div>
-        <div class="mt-1 small text-secondary">
-          ${descText}
+        <div class="mt-1 small text-muted">
+          Ajuste o valor promocional ou o desconto para manter a saúde financeira.
         </div>
       `;
+      compWrapper.style.backgroundColor = "rgba(220, 38, 38, 0.05)";
+      compWrapper.style.borderColor = "rgba(220, 38, 38, 0.2)";
     } else {
-      compWrapper.innerHTML = `
-        <div class="text-center text-muted py-2 small">
-          <i class="bi bi-info-circle me-1"></i> Preencha o "Preço de referência" para comparar a competitividade do seu preço sugerido.
-        </div>
-      `;
+      compWrapper.style.backgroundColor = "";
+      compWrapper.style.borderColor = "";
+      
+      if (precoReferencia > 0) {
+        const precoVenda = resultadoFinal.precoVenda;
+        const diff = precoVenda - precoReferencia;
+        const diffPercent = (diff / precoReferencia) * 100;
+        
+        let badgeClass = "";
+        let badgeText = "";
+        let descText = "";
+        
+        if (diff < -0.01) {
+          badgeClass = "bg-success";
+          badgeText = "Abaixo da Referência";
+          descText = `Seu preço está <strong class="text-success">${formatCurrency(Math.abs(diff))} mais barato</strong> (${diffPercent.toFixed(1)}%) em relação ao concorrente.`;
+        } else if (Math.abs(diff) <= 0.01) {
+          badgeClass = "bg-warning text-dark";
+          badgeText = "Igual à Referência";
+          descText = `Seu preço está <strong>exatamente igual</strong> ao preço do concorrente.`;
+        } else {
+          badgeClass = "bg-danger";
+          badgeText = "Acima da Referência";
+          descText = `Seu preço está <strong class="text-danger">${formatCurrency(diff)} mais caro</strong> (+${diffPercent.toFixed(1)}%) que o concorrente.`;
+        }
+        
+        compWrapper.innerHTML = `
+          <div class="d-flex align-items-center justify-content-between">
+            <span class="small fw-semibold text-muted">Comparação (Canal Ativo)</span>
+            <span class="badge ${badgeClass}">${badgeText}</span>
+          </div>
+          <div class="mt-2 small text-secondary">
+            Preço concorrente: <strong class="text-dark">${formatCurrency(precoReferencia)}</strong>
+          </div>
+          <div class="mt-1 small text-secondary">
+            ${descText}
+          </div>
+        `;
+      } else {
+        compWrapper.innerHTML = `
+          <div class="text-center text-muted py-2 small">
+            <i class="bi bi-info-circle me-1"></i> Preencha o "Preço de referência" para comparar a competitividade do seu preço sugerido.
+          </div>
+        `;
+      }
     }
   }
 
@@ -626,6 +784,8 @@ function atualizarResultado(faixaForcada) {
   }
 
   // Prepara o array de inserção em lote para o histórico
+  const descontoVal = Number(document.getElementById("calcPromoDesconto")?.value) || 0;
+
   ultimoCalculosArray = selectedLojasIds.map(id => {
     const res = obterCalculoParaLoja(id);
     const l = id ? lojasCache.find(x => x.id === id) : null;
@@ -646,6 +806,11 @@ function atualizarResultado(faixaForcada) {
       fix = taxaFixa;
     }
 
+    let pPromocional = null;
+    if (simularPromo && descontoVal > 0) {
+      pPromocional = res.precoVenda * (1 - descontoVal / 100);
+    }
+
     return {
       nome_produto: document.getElementById("calcNomeProduto").value.trim(),
       link_venda: document.getElementById("calcLinkVenda").value.trim() || null,
@@ -658,7 +823,10 @@ function atualizarResultado(faixaForcada) {
       lucro_desejado: lucro,
       taxa_percentual_usada: pct,
       taxa_fixa_usada: fix,
-      preco_venda: res.precoVenda
+      preco_venda: res.precoVenda,
+      promo_ativa: simularPromo,
+      promo_desconto_percentual: simularPromo ? descontoVal : null,
+      preco_promocional: pPromocional
     };
   });
 
@@ -787,7 +955,7 @@ async function loadHistorico() {
   // duplicado sempre enxergam todos os produtos cadastrados.
   const { data, error } = await supabaseClient
     .from("calculos_preco")
-    .select("id, nome_produto, link_venda, link_referencia, preco_referencia, preco_venda, custo_produto, custo_embalagem, custo_operacional, lucro_desejado, taxa_percentual_usada, taxa_fixa_usada, loja_id, created_at, lojas_ecommerce(id, nome)")
+    .select("id, nome_produto, link_venda, link_referencia, preco_referencia, preco_venda, custo_produto, custo_embalagem, custo_operacional, lucro_desejado, taxa_percentual_usada, taxa_fixa_usada, loja_id, created_at, promo_ativa, promo_desconto_percentual, preco_promocional, lojas_ecommerce(id, nome)")
     .eq("empresa_id", currentEmpresaId)
     .order("created_at", { ascending: false })
     .limit(1000);
@@ -873,6 +1041,24 @@ function preencherFormularioComCalculo(c) {
   }
   document.getElementById("calcLucro").value = lucroPct;
   document.getElementById("calcLucroTipo").value = "percentual";
+
+  // Preenche a promoção
+  const simularPromoCheckbox = document.getElementById("calcSimularPromo");
+  const promoFields = document.getElementById("calcPromoFields");
+  const inputPromoDesconto = document.getElementById("calcPromoDesconto");
+  const inputPromoPreco = document.getElementById("calcPromoPreco");
+
+  if (c.promo_ativa) {
+    if (simularPromoCheckbox) simularPromoCheckbox.checked = true;
+    promoFields?.classList.remove("d-none");
+    if (inputPromoDesconto) inputPromoDesconto.value = c.promo_desconto_percentual || "";
+    if (inputPromoPreco) inputPromoPreco.value = c.preco_promocional || "";
+  } else {
+    if (simularPromoCheckbox) simularPromoCheckbox.checked = false;
+    promoFields?.classList.add("d-none");
+    if (inputPromoDesconto) inputPromoDesconto.value = "";
+    if (inputPromoPreco) inputPromoPreco.value = "";
+  }
 
   atualizarResultado();
 }
@@ -988,27 +1174,56 @@ function renderHistoricoPagina() {
     tr.setAttribute("aria-label", `Ver detalhes do cálculo de ${escapeHtml(g.nome_produto)}`);
     tr.onclick = () => verCalculoGrupo(g.nome_produto.trim().toLowerCase());
 
-    // Badges para as lojas calculadas
+    // Badges para as lojas calculadas com as cores de marca especificadas
     const storesHtml = g.items.map(item => {
       const storeName = item.lojas_ecommerce?.nome || "Manual";
-      return `<span class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle px-2 py-0.5 me-1" style="font-size: 0.65rem;">${escapeHtml(storeName)}</span>`;
+      const nameLower = storeName.toLowerCase().trim();
+      
+      let badgeClass = "badge px-2 py-0.5 me-1";
+      if (nameLower.includes("shopee")) {
+        badgeClass += " badge-store-shopee";
+      } else if (nameLower.includes("tiktok")) {
+        badgeClass += " badge-store-tiktok";
+      } else if (nameLower.includes("amazon")) {
+        badgeClass += " badge-store-amazon";
+      } else if (nameLower.includes("mercado livre") || nameLower.includes("mercado_livre")) {
+        badgeClass += " badge-store-mercadolivre";
+      } else if (nameLower.includes("manual")) {
+        badgeClass += " badge-store-manual";
+      } else {
+        badgeClass += " badge-store-generic";
+      }
+      
+      return `<span class="${badgeClass}" style="font-size: 0.65rem;">${escapeHtml(storeName)}</span>`;
     }).join("");
+
+    const hasPromo = g.items.some(item => item.promo_ativa);
+    const promoBadgeHtml = hasPromo 
+      ? `<span class="badge ms-1" style="background-color: #FEE2E2 !important; color: #EF4444 !important; border: 1px solid #FCA5A5 !important; font-size: 0.6rem;">Promoção</span>` 
+      : "";
 
     // Exibe preços lado a lado
     const pricesHtml = g.items.map(item => {
       const storeName = item.lojas_ecommerce?.nome || "Manual";
-      return `<span class="text-nowrap"><strong class="text-muted" style="font-size:0.7rem;">${escapeHtml(storeName)}:</strong> ${formatCurrency(item.preco_venda)}</span>`;
+      if (item.promo_ativa && item.preco_promocional > 0) {
+        return `<span class="text-nowrap"><strong class="text-muted" style="font-size:0.7rem;">${escapeHtml(storeName)}:</strong> <span class="text-decoration-line-through text-muted small me-1">${formatCurrency(item.preco_venda)}</span><span class="text-danger fw-semibold">${formatCurrency(item.preco_promocional)}</span></span>`;
+      } else {
+        return `<span class="text-nowrap"><strong class="text-muted" style="font-size:0.7rem;">${escapeHtml(storeName)}:</strong> ${formatCurrency(item.preco_venda)}</span>`;
+      }
     }).join(" <span class='text-muted mx-1'>|</span> ");
 
     tr.innerHTML = `
       <td>
-        <div class="fw-semibold text-dark">${escapeHtml(g.nome_produto)}</div>
+        <div class="fw-semibold text-dark d-flex align-items-center gap-1">
+          <span>${escapeHtml(g.nome_produto)}</span>
+          ${promoBadgeHtml}
+        </div>
         <div class="mt-1 d-flex flex-wrap align-items-center gap-1">${storesHtml}</div>
       </td>
-      <td colspan="2"><div class="d-flex flex-wrap py-1">${pricesHtml}</div></td>
+      <td colspan="2" class="d-none d-md-table-cell"><div class="d-flex flex-wrap py-1">${pricesHtml}</div></td>
       <td>${formatTimestamp(g.created_at)}</td>
       <td class="text-end">
-        <button type="button" class="btn btn-sm btn-outline-danger" aria-label="Excluir produto ${escapeHtml(g.nome_produto)}" onclick="event.stopPropagation(); excluirCalculoGrupo('${escapeHtml(g.nome_produto)}')"><i class="bi bi-trash"></i></button>
+        <button type="button" class="btn btn-sm btn-outline-danger" data-produto="${escapeHtml(g.nome_produto)}" aria-label="Excluir produto ${escapeHtml(g.nome_produto)}" onclick="event.stopPropagation(); excluirCalculoGrupo(this.getAttribute('data-produto'))"><i class="bi bi-trash"></i></button>
       </td>
     `;
     tbody.appendChild(tr);
@@ -1027,14 +1242,29 @@ function verCalculoGrupo(key) {
   const tabsContainer = document.getElementById("verCalculoTabs");
   
   const renderItemDetails = (c) => {
-    document.getElementById("verPrecoVenda").textContent = formatCurrency(c.preco_venda);
+    const isPromo = c.promo_ativa && c.preco_promocional > 0;
+    const pVenda = isPromo ? Number(c.preco_promocional) : Number(c.preco_venda);
+    const valorTaxaPercentual = pVenda * (Number(c.taxa_percentual_usada) / 100);
+    const liquido = pVenda - valorTaxaPercentual - Number(c.taxa_fixa_usada) - Number(c.custo_embalagem) - Number(c.custo_operacional);
+    const lucroReal = liquido - Number(c.custo_produto);
+
+    if (isPromo) {
+      document.getElementById("verPrecoVenda").innerHTML = `<span class="text-muted text-decoration-line-through small me-1">${formatCurrency(c.preco_venda)}</span> <span class="text-danger fw-bold">${formatCurrency(c.preco_promocional)}</span> <span class="badge bg-danger-subtle text-danger ms-1" style="font-size: 0.65rem;">${Number(c.promo_desconto_percentual).toFixed(1)}% OFF</span>`;
+      
+      const isPrejuizo = lucroReal < 0;
+      const colorClass = isPrejuizo ? "text-danger" : "text-success";
+      document.getElementById("verLucro").innerHTML = `<span class="text-muted text-decoration-line-through me-1">${formatCurrency(c.lucro_desejado)}</span> <span class="${colorClass} fw-semibold">${formatCurrency(lucroReal)}</span>`;
+    } else {
+      document.getElementById("verPrecoVenda").innerHTML = `<span>${formatCurrency(c.preco_venda)}</span>`;
+      document.getElementById("verLucro").innerHTML = `<span>${formatCurrency(c.lucro_desejado)}</span>`;
+    }
+
     document.getElementById("verLoja").textContent = c.lojas_ecommerce?.nome || "Manual";
     document.getElementById("verCustoProduto").textContent = formatCurrency(c.custo_produto);
     document.getElementById("verEmbalagem").textContent = formatCurrency(c.custo_embalagem);
     document.getElementById("verOperacional").textContent = formatCurrency(c.custo_operacional);
-    document.getElementById("verLucro").textContent = formatCurrency(c.lucro_desejado);
     document.getElementById("verTaxaFixa").textContent = formatCurrency(c.taxa_fixa_usada);
-    document.getElementById("verTaxaPercentual").textContent = `${Number(c.taxa_percentual_usada).toFixed(2)}%`;
+    document.getElementById("verTaxaPercentual").textContent = `${Number(c.taxa_percentual_usada).toFixed(2)}% (${formatCurrency(valorTaxaPercentual)})`;
 
     const precoRefRow = document.getElementById("verPrecoReferenciaRow");
     const precoRefVal = document.getElementById("verPrecoReferencia");

@@ -205,11 +205,19 @@ function confirmDialog(message, { confirmText = "Confirmar", danger = true } = {
   });
 }
 
-// Mostra um estado de carregamento numa tabela enquanto os dados não chegam.
 function tableLoading(tbodyId, colspan, label = "Carregando...") {
   const tbody = document.getElementById(tbodyId);
   if (tbody) {
-    tbody.innerHTML = `<tr><td colspan="${colspan}" class="table-empty"><span class="spinner-border spinner-border-sm me-2"></span>${label}</td></tr>`;
+    let rowsHtml = "";
+    for (let r = 0; r < 3; r++) {
+      let colsHtml = "";
+      for (let c = 0; c < colspan; c++) {
+        const width = c === 0 ? "55%" : c === colspan - 1 ? "35%" : "70%";
+        colsHtml += `<td><div class="shimmer-placeholder" style="width: ${width}; height: 16px; border-radius: 4px; margin: 4px 0;"></div></td>`;
+      }
+      rowsHtml += `<tr>${colsHtml}</tr>`;
+    }
+    tbody.innerHTML = rowsHtml;
   }
 }
 

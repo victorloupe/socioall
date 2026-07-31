@@ -1,6 +1,19 @@
 let currentEmpresaId = null;
 let currentUserId = null;
 let sociosNomeCache = {};
+let oldLogoUrl = null;
+
+// Extrai o caminho relativo do bucket do Storage do Supabase a partir de uma URL pública.
+// Ex: "https://[project].supabase.co/storage/v1/object/public/logos/abc-123/logo-172.png" -> "abc-123/logo-172.png"
+function getStoragePathFromUrl(url, bucketName) {
+  if (!url) return null;
+  const marker = `/storage/v1/object/public/${bucketName}/`;
+  const index = url.indexOf(marker);
+  if (index !== -1) {
+    return url.substring(index + marker.length);
+  }
+  return null;
+}
 
 // Página "Configurações": reúne os dados da empresa e a gestão de sócios em
 // abas (antes eram duas páginas — empresa.html e socios.html — mescladas a
@@ -9,6 +22,7 @@ async function initConfiguracoes() {
   const ctx = await initAuthenticatedPage('empresa');
   if (!ctx) return;
   currentEmpresaId = ctx.empresaId;
+  oldLogoUrl = ctx.logoUrl || null;
 
   const { data: { session } } = await supabaseClient.auth.getSession();
   currentUserId = session.user.id;
@@ -110,8 +124,10 @@ if (empresaForm) {
         // Campos "core" (presentes desde a primeira versão do schema) — sempre devem poder ser salvos.
         const update = { nome, site: site || null, endereco: endereco || null };
 
+        let newLogoUrl = null;
         if (file) {
-          update.logo_url = await uploadLogo(file);
+          newLogoUrl = await uploadLogo(file);
+          update.logo_url = newLogoUrl;
         }
 
         const { error } = await supabaseClient
@@ -121,7 +137,20 @@ if (empresaForm) {
 
         if (error) throw error;
 
-        if (update.logo_url) renderLogoPreview(update.logo_url);
+        if (newLogoUrl) {
+          renderLogoPreview(newLogoUrl);
+          // Remove a logo antiga do Storage para não deixar arquivo órfão
+          if (oldLogoUrl) {
+            const oldPath = getStoragePathFromUrl(oldLogoUrl, "logos");
+            if (oldPath) {
+              const { error: deleteError } = await supabaseClient.storage.from("logos").remove([oldPath]);
+              if (deleteError) {
+                console.error("Falha ao remover logo antiga do Storage:", deleteError);
+              }
+            }
+          }
+          oldLogoUrl = newLogoUrl; // Atualiza a referência
+        }
         fileInput.value = "";
 
         // Campos extras (cnpj/telefone/email_contato, sql/schema_completo.sql) — salvos à

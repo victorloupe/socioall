@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
+
 :root {
   --sa-primary: #072150;
   --sa-primary-dark: #04122E;
@@ -30,6 +32,7 @@ body {
 }
 
 h1, h2, h3, .h4, .h6 {
+  font-family: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
   letter-spacing: -0.01em;
 }
 
@@ -828,6 +831,12 @@ h1, h2, h3, .h4, .h6 {
   border-radius: var(--sa-radius);
   box-shadow: var(--sa-shadow);
   padding: 18px 20px;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-sa:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 20px rgba(15, 23, 42, 0.08);
 }
 
 .stat-card {
@@ -926,6 +935,7 @@ h1, h2, h3, .h4, .h6 {
   border-color: var(--sa-border);
   border-radius: var(--sa-radius-sm);
   padding: 8px 12px;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
 }
 
 .form-control:focus, .form-select:focus {
@@ -1060,8 +1070,8 @@ h1, h2, h3, .h4, .h6 {
   height: 260px;
 }
 
-.table-sa tbody tr:hover {
-  background-color: var(--sa-bg);
+.table-sa tbody tr:hover td {
+  background-color: #F8FAFC !important;
 }
 
 .table-empty {
@@ -1557,8 +1567,8 @@ h1, h2, h3, .h4, .h6 {
 }
 
 #lojaFaixasContainer {
-  min-height: 110px;
-  height: 110px;
+  min-height: 95px;
+  height: auto;
   display: block;
 }
 
@@ -1620,8 +1630,8 @@ html.dark-theme .table {
   --bs-table-border-color: var(--sa-border);
 }
 
-html.dark-theme .table-sa tbody tr:hover {
-  background-color: rgba(255, 255, 255, 0.02) !important;
+html.dark-theme .table-sa tbody tr:hover td {
+  background-color: rgba(255, 255, 255, 0.03) !important;
 }
 
 html.dark-theme .modal-content {
@@ -1672,4 +1682,135 @@ html.dark-theme ::-webkit-scrollbar-thumb {
 
 .theme-toggle-btn:hover {
   color: var(--sa-teal);
+}
+
+/* ---------- EFEITOS VISUAIS PREMIUM (UI/UX) ---------- */
+
+/* 1. Glassmorphism para Sidebar */
+.sidebar-col {
+  background-color: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+html.dark-theme .sidebar-col {
+  background-color: rgba(19, 28, 53, 0.85) !important;
+}
+
+/* 2. Gradientes e Bordas nos Stat Cards */
+.stat-card {
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.stat-card:has(.value-positive) {
+  background: linear-gradient(135deg, #ffffff 0%, var(--sa-teal-light) 100%);
+  border-left: 4px solid var(--sa-teal);
+}
+
+.stat-card:has(.value-negative) {
+  background: linear-gradient(135deg, #ffffff 0%, #FFF5F5 100%);
+  border-left: 4px solid var(--sa-danger);
+}
+
+.stat-card:has(#totalLucro), .stat-card:has(#resumoLucro) {
+  background: linear-gradient(135deg, #ffffff 0%, #F8FAFC 100%);
+  border-left: 4px solid #64748B;
+}
+
+/* Overrides de Cores dos Ícones de KPI */
+.stat-card:has(.value-positive) .stat-icon {
+  background-color: var(--sa-teal-dark);
+  color: #ffffff;
+}
+
+.stat-card:has(.value-negative) .stat-icon {
+  background-color: var(--sa-danger);
+  color: #ffffff;
+}
+
+.stat-card:has(#totalLucro) .stat-icon, .stat-card:has(#resumoLucro) .stat-icon {
+  background-color: #64748B;
+  color: #ffffff;
+}
+
+/* Modo Escuro para os KPIs */
+html.dark-theme .stat-card:has(.value-positive) {
+  background: linear-gradient(135deg, var(--sa-card) 0%, rgba(14, 167, 154, 0.08) 100%);
+}
+
+html.dark-theme .stat-card:has(.value-negative) {
+  background: linear-gradient(135deg, var(--sa-card) 0%, rgba(220, 38, 38, 0.08) 100%);
+}
+
+html.dark-theme .stat-card:has(#totalLucro), html.dark-theme .stat-card:has(#resumoLucro) {
+  background: linear-gradient(135deg, var(--sa-card) 0%, rgba(148, 163, 184, 0.08) 100%);
+}
+
+/* 3. Shimmer Skeleton Loader */
+.shimmer-placeholder {
+  background: #f1f5f9;
+  background-image: linear-gradient(90deg, #f1f5f9 0px, #e2e8f0 40px, #f1f5f9 80px);
+  background-size: 600px 100%;
+  animation: shimmer-pulse 1.6s infinite linear;
+}
+
+html.dark-theme .shimmer-placeholder {
+  background: #1e293b;
+  background-image: linear-gradient(90deg, #1e293b 0px, #334155 40px, #1e293b 80px);
+}
+
+@keyframes shimmer-pulse {
+  0% { background-position: -200px 0; }
+  100% { background-position: 400px 0; }
+}
+
+/* 4. Estilos de Lojas (Calculadora e Badges do Histórico) - Azul Pastel com Escrito em Preto */
+.btn-store-shopee, .badge-store-shopee,
+.btn-store-tiktok, .badge-store-tiktok,
+.btn-store-amazon, .badge-store-amazon,
+.btn-store-mercadolivre, .badge-store-mercadolivre,
+.btn-store-manual, .badge-store-manual,
+.btn-store-generic, .badge-store-generic {
+  background-color: #E3F2FD !important;
+  color: #1E293B !important; /* Escrito em Preto/Grafite escuro */
+  border: 1px solid #C2E7FF !important;
+}
+
+/* Dark Mode para Botões e Badges - Azul Pastel com Escrito em Branco/Claro */
+html.dark-theme .btn-store-shopee, html.dark-theme .badge-store-shopee,
+html.dark-theme .btn-store-tiktok, html.dark-theme .badge-store-tiktok,
+html.dark-theme .btn-store-amazon, html.dark-theme .badge-store-amazon,
+html.dark-theme .btn-store-mercadolivre, html.dark-theme .badge-store-mercadolivre,
+html.dark-theme .btn-store-manual, html.dark-theme .badge-store-manual,
+html.dark-theme .btn-store-generic, html.dark-theme .badge-store-generic {
+  background-color: rgba(11, 94, 215, 0.15) !important;
+  color: #F1F5F9 !important; /* Escrito em Branco/Claro para contraste no dark mode */
+  border-color: rgba(11, 94, 215, 0.3) !important;
+}
+
+/* 5. Customização do Modal de Detalhes (Tabs nav-pills) */
+#verCalculoTabs {
+  background-color: var(--sa-border) !important;
+}
+
+#verCalculoTabs .nav-link {
+  color: var(--sa-text-secondary) !important;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+#verCalculoTabs .nav-link.active {
+  background-color: #E3F2FD !important; /* Soft Blue Pastel */
+  color: #1E293B !important; /* Escrito em Preto/Grafite escuro */
+  box-shadow: var(--sa-shadow-sm);
+}
+
+/* Dark Mode para as Tabs do Modal */
+html.dark-theme #verCalculoTabs {
+  background-color: #1E293B !important;
+}
+
+html.dark-theme #verCalculoTabs .nav-link.active {
+  background-color: rgba(11, 94, 215, 0.25) !important;
+  color: #F1F5F9 !important; /* Escrito em Branco/Claro no dark mode */
 }

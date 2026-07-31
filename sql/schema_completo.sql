@@ -381,6 +381,11 @@ alter table lojas_ecommerce add column if not exists updated_at timestamptz;
 update lojas_ecommerce set updated_at = created_at where updated_at is null;
 alter table lojas_ecommerce alter column updated_at set default now();
 
+alter table lojas_ecommerce add column if not exists shopee_shop_id bigint;
+alter table lojas_ecommerce add column if not exists shopee_access_token text;
+alter table lojas_ecommerce add column if not exists shopee_refresh_token text;
+alter table lojas_ecommerce add column if not exists shopee_token_expires_at timestamptz;
+
 create or replace function touch_updated_at()
 returns trigger
 language plpgsql
@@ -431,6 +436,10 @@ create table if not exists calculos_preco (
 
 alter table calculos_preco add column if not exists preco_referencia numeric(12,2);
 
+alter table calculos_preco add column if not exists promo_ativa boolean not null default false;
+alter table calculos_preco add column if not exists promo_desconto_percentual numeric(5,2);
+alter table calculos_preco add column if not exists preco_promocional numeric(12,2);
+
 alter table calculos_preco enable row level security;
 grant select, insert, update, delete on calculos_preco to authenticated;
 
@@ -440,6 +449,13 @@ create policy "calculos_preco_all" on calculos_preco for all
   with check (empresa_id in (select * from get_user_empresas(auth.uid())));
 
 create index if not exists idx_calculos_preco_empresa on calculos_preco(empresa_id, created_at desc);
+
+create unique index if not exists idx_calculos_preco_unico_produto_loja
+  on calculos_preco (
+    empresa_id,
+    lower(trim(nome_produto)),
+    coalesce(loja_id, '00000000-0000-0000-0000-000000000000'::uuid)
+  );
 
 -- Placeholder para a futura integração de pedidos vindos dos marketplaces
 -- (ainda sem nenhuma integração real — só a estrutura pronta).
