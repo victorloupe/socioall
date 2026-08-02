@@ -11,6 +11,7 @@ let historicoPaginaAtual = 0;
 let historicoItensPorPagina = 10;
 let historicoGruposOrdenados = [];
 let historicoBuscaTermo = "";
+let filtroApenasKits = false;
 
 async function initPrecificacao() {
   const ctx = await initAuthenticatedPage('precificacao');
@@ -31,21 +32,60 @@ async function initPrecificacao() {
     renderHistoricoPagina();
   });
 
+  document.getElementById("btnFiltroKits")?.addEventListener("click", (e) => {
+    filtroApenasKits = !filtroApenasKits;
+    const btn = e.currentTarget;
+    if (filtroApenasKits) {
+      btn.classList.remove("btn-outline-secondary");
+      btn.classList.add("btn-primary", "text-white");
+    } else {
+      btn.classList.remove("btn-primary", "text-white");
+      btn.classList.add("btn-outline-secondary");
+    }
+    historicoPaginaAtual = 0;
+    renderHistoricoPagina();
+  });
+
+  document.querySelectorAll('input[name="calcTipoProduto"]').forEach(radio => {
+    radio.addEventListener("change", (e) => {
+      const tipo = e.target.value;
+      const compWrapper = document.getElementById("calcKitComponentesWrapper");
+
+      if (tipo === "kit") {
+        compWrapper?.classList.remove("d-none");
+        const lista = document.getElementById("kitComponentesLista");
+        if (lista && lista.children.length === 0) {
+          adicionarLinhaComponente();
+          adicionarLinhaComponente();
+        }
+      } else {
+        compWrapper?.classList.add("d-none");
+        const lista = document.getElementById("kitComponentesLista");
+        if (lista) lista.innerHTML = "";
+      }
+    });
+  });
+
   let nomeProdutoBuscaTimeout;
   document.getElementById("calcNomeProduto")?.addEventListener("input", (e) => {
     clearTimeout(nomeProdutoBuscaTimeout);
     nomeProdutoBuscaTimeout = setTimeout(() => {
       const termo = e.target.value.trim().toLowerCase();
       atualizarHintProdutoExistente(termo);
-      renderSugestoesProduto(termo);
     }, 300);
   });
 
   // Fecha as sugestões ao clicar fora do campo
   document.addEventListener("click", (e) => {
-    if (!e.target.closest("#produtoSugestoesWrapper")) {
-      document.getElementById("produtoSugestoes")?.classList.remove("show");
-    }
+    document.querySelectorAll(".comp-row").forEach(row => {
+      if (!row.contains(e.target)) {
+        row.querySelector(".comp-sugestoes-box")?.classList.remove("show");
+      }
+    });
+  });
+
+  document.getElementById("btnAdicionarComp")?.addEventListener("click", () => {
+    adicionarLinhaComponente();
   });
 
   document.getElementById("historicoItensPorPagina")?.addEventListener("change", (e) => {
@@ -639,15 +679,24 @@ function atualizarResultado(faixaForcada) {
   document.getElementById("resOperacional").textContent = formatCurrency(custoOperacional);
 
   const resLucroEl = document.getElementById("resLucro");
+  const resLucroBox = document.getElementById("resLucroBox");
+  const margemLiquida = resultadoFinal.precoVenda > 0 ? (lucroFinal / resultadoFinal.precoVenda) * 100 : 0;
+  const isPrejuizo = lucroFinal < 0;
+  const colorClass = isPrejuizo ? "text-danger" : "text-success";
+
+  if (resLucroBox) {
+    if (isPrejuizo) {
+      resLucroBox.classList.add("sa-lucro-prejuizo");
+    } else {
+      resLucroBox.classList.remove("sa-lucro-prejuizo");
+    }
+  }
+
   if (simularPromo && precoPromocional > 0) {
     const originalLucroText = lucroTipo === "percentual" ? `${lucroInput.toFixed(2)}% (${formatCurrency(lucro)})` : formatCurrency(lucro);
-    const isPrejuizo = lucroFinal < 0;
-    const colorClass = isPrejuizo ? "text-danger" : "text-success";
-    resLucroEl.innerHTML = `<span class="text-muted text-decoration-line-through me-1">${originalLucroText}</span> <span class="${colorClass} fw-semibold">${formatCurrency(lucroFinal)}</span>`;
+    resLucroEl.innerHTML = `<span class="text-muted text-decoration-line-through me-1">${originalLucroText}</span> <span class="${colorClass} fw-semibold">${formatCurrency(lucroFinal)} (Margem: ${margemLiquida.toFixed(1)}%)</span>`;
   } else {
-    resLucroEl.innerHTML = lucroTipo === "percentual"
-      ? `<span>${lucroInput.toFixed(2)}% (${formatCurrency(lucro)})</span>`
-      : `<span>${formatCurrency(lucro)}</span>`;
+    resLucroEl.innerHTML = `<span class="${colorClass} fw-semibold">${formatCurrency(lucroFinal)} (Margem: ${margemLiquida.toFixed(1)}%)</span>`;
   }
 
   document.getElementById("resTaxaFixa").textContent = formatCurrency(taxaFixa);
@@ -891,24 +940,46 @@ document.getElementById("salvarCalculoBtn")?.addEventListener("click", async (e)
 
   const btn = e.currentTarget;
   await withLoadingButton(btn, "Salvando...", async () => {
+    // Coleta os componentes da lista
+    const rows = document.querySelectorAll("#kitComponentesLista .comp-row");
+    const componentes = [];
+    rows.forEach(row => {
+      const val = row.querySelector(".comp-input-field").value.trim();
+      if (val) {
+        componentes.push(val);
+      }
+    });
+
+    const radioKit = document.getElementById("calcTipoKit");
+    let nomeSalvar = nomeProduto;
+    if (radioKit && radioKit.checked) {
+      if (componentes.length > 0) {
+        nomeSalvar = `${nomeProduto}\u200B${componentes.join(" + ")}`;
+      } else {
+        nomeSalvar = `${nomeProduto}\u200B`;
+      }
+    }
+
     const recordsToInsert = ultimoCalculosArray.map(calc => ({
       empresa_id: currentEmpresaId,
       socio_id: currentSocioId,
       ...calc,
-      nome_produto: nomeProduto
+      nome_produto: nomeSalvar
     }));
 
     // Evita duplicados: remove registros anteriores do mesmo produto nas mesmas lojas
     const lojaIdsToSave = recordsToInsert.map(r => r.loja_id);
-    const nomeNormalizado = nomeProduto.toLowerCase();
+    const cleanNomeNormalizado = nomeProduto.toLowerCase();
     const { data: existentes } = await supabaseClient
       .from("calculos_preco")
       .select("id, nome_produto, loja_id")
-      .eq("empresa_id", currentEmpresaId)
-      .ilike("nome_produto", nomeProduto);
+      .eq("empresa_id", currentEmpresaId);
 
     const idsParaExcluir = (existentes || [])
-      .filter(c => c.nome_produto.trim().toLowerCase() === nomeNormalizado && lojaIdsToSave.includes(c.loja_id))
+      .filter(c => {
+        const cleanNameExistente = c.nome_produto.split('\u200B')[0].trim().toLowerCase();
+        return cleanNameExistente === cleanNomeNormalizado && lojaIdsToSave.includes(c.loja_id);
+      })
       .map(c => c.id);
 
     if (idsParaExcluir.length > 0) {
@@ -970,7 +1041,7 @@ async function loadHistorico() {
   // Agrupa os cálculos pelo nome do produto (ignorando espaços e case-sensitive)
   groupedCalculosCache = {};
   historicoCache.forEach(c => {
-    const key = c.nome_produto.trim().toLowerCase();
+    const key = c.nome_produto.split('\u200B')[0].trim().toLowerCase();
     if (!groupedCalculosCache[key]) {
       groupedCalculosCache[key] = {
         nome_produto: c.nome_produto,
@@ -1004,6 +1075,10 @@ function getGruposFiltrados() {
       .filter(Boolean);
   }
 
+  if (filtroApenasKits) {
+    grupos = grupos.filter(g => g.nome_produto.endsWith('\u200B'));
+  }
+
   if (historicoBuscaTermo) {
     grupos = grupos.filter(g => g.nome_produto.toLowerCase().includes(historicoBuscaTermo));
   }
@@ -1025,7 +1100,36 @@ function atualizarHintProdutoExistente(termo) {
 
 // Preenche o formulário da calculadora com os dados de um cálculo salvo
 function preencherFormularioComCalculo(c) {
-  document.getElementById("calcNomeProduto").value = c.nome_produto || "";
+  const parts = (c.nome_produto || "").split('\u200B');
+  const cleanName = parts[0];
+  const componentesStr = parts[1];
+
+  document.getElementById("calcNomeProduto").value = cleanName;
+  
+  const radioUnitario = document.getElementById("calcTipoUnitario");
+  const radioKit = document.getElementById("calcTipoKit");
+  const compWrapper = document.getElementById("calcKitComponentesWrapper");
+  const lista = document.getElementById("kitComponentesLista");
+  if (lista) lista.innerHTML = "";
+
+  if (radioUnitario && radioKit) {
+    if ((c.nome_produto || "").includes('\u200B')) {
+      radioKit.checked = true;
+      compWrapper?.classList.remove("d-none");
+      
+      if (componentesStr) {
+        const partesComponentes = componentesStr.split(/\s*\+\s*/);
+        partesComponentes.forEach(part => adicionarLinhaComponente(part));
+      } else {
+        adicionarLinhaComponente();
+        adicionarLinhaComponente();
+      }
+    } else {
+      radioUnitario.checked = true;
+      compWrapper?.classList.add("d-none");
+    }
+  }
+
   document.getElementById("calcLinkVenda").value = c.link_venda || "";
   document.getElementById("calcLinkReferencia").value = c.link_referencia || "";
   document.getElementById("calcPrecoReferencia").value = c.preco_referencia || "";
@@ -1063,52 +1167,7 @@ function preencherFormularioComCalculo(c) {
   atualizarResultado();
 }
 
-// Dropdown de sugestões de produtos já cadastrados (autocomplete do nome do produto)
-function renderSugestoesProduto(termo) {
-  const box = document.getElementById("produtoSugestoes");
-  if (!box) return;
 
-  const matches = termo
-    ? historicoGruposOrdenados.filter(g => g.nome_produto.toLowerCase().includes(termo)).slice(0, 8)
-    : [];
-
-  if (matches.length === 0) {
-    box.classList.remove("show");
-    box.innerHTML = "";
-    return;
-  }
-
-  box.innerHTML = matches.map(g => {
-    const key = g.nome_produto.trim().toLowerCase();
-    const lojas = g.items.map(i => i.lojas_ecommerce?.nome || "Manual").join(", ");
-    return `
-      <button type="button" class="dropdown-item small d-flex justify-content-between align-items-center gap-2" data-sugestao-key="${escapeHtml(key)}">
-        <span class="text-truncate">${escapeHtml(g.nome_produto)}</span>
-        <span class="text-muted text-nowrap" style="font-size: 0.7rem;">${escapeHtml(lojas)}</span>
-      </button>
-    `;
-  }).join("");
-
-  box.querySelectorAll("[data-sugestao-key]").forEach(btn => {
-    btn.onclick = () => {
-      box.classList.remove("show");
-      usarSugestaoProduto(btn.dataset.sugestaoKey);
-    };
-  });
-
-  box.classList.add("show");
-}
-
-// Carrega o cálculo salvo da sugestão clicada como modelo no formulário
-function usarSugestaoProduto(key) {
-  const g = groupedCalculosCache[key];
-  if (!g || g.items.length === 0) return;
-
-  preencherFormularioComCalculo(g.items[0]);
-  atualizarHintProdutoExistente(key);
-
-  showToast(`Dados de "${g.nome_produto}" carregados como modelo.`);
-}
 
 function renderHistoricoPagina() {
   const gruposFiltrados = getGruposFiltrados();
@@ -1171,8 +1230,8 @@ function renderHistoricoPagina() {
     const tr = document.createElement("tr");
     tr.style.cursor = "pointer";
     tr.setAttribute("role", "button");
-    tr.setAttribute("aria-label", `Ver detalhes do cálculo de ${escapeHtml(g.nome_produto)}`);
-    tr.onclick = () => verCalculoGrupo(g.nome_produto.trim().toLowerCase());
+    tr.setAttribute("aria-label", `Ver detalhes do cálculo de ${escapeHtml(g.nome_produto.split('\u200B')[0])}`);
+    tr.onclick = () => verCalculoGrupo(g.nome_produto.split('\u200B')[0].trim().toLowerCase());
 
     // Badges para as lojas calculadas com as cores de marca especificadas
     const storesHtml = g.items.map(item => {
@@ -1212,18 +1271,30 @@ function renderHistoricoPagina() {
       }
     }).join(" <span class='text-muted mx-1'>|</span> ");
 
+    const parts = g.nome_produto.split('\u200B');
+    const cleanName = parts[0];
+    const componentesStr = parts[1];
+    
+    let compHtml = "";
+    if (componentesStr) {
+      compHtml = `<div class="text-muted small mt-0.5" style="font-size: 0.65rem;">Itens: ${escapeHtml(componentesStr)}</div>`;
+    }
+
+    const mobilePricesHtml = `<div class="d-block d-md-none mt-2 pt-2 border-top border-light" style="border-top-style: dashed !important;">${pricesHtml}</div>`;
+
     tr.innerHTML = `
       <td>
         <div class="fw-semibold text-dark d-flex align-items-center gap-1">
-          <span>${escapeHtml(g.nome_produto)}</span>
+          <span>${escapeHtml(cleanName)}</span>
           ${promoBadgeHtml}
         </div>
-        <div class="mt-1 d-flex flex-wrap align-items-center gap-1">${storesHtml}</div>
+        ${compHtml}
+        ${mobilePricesHtml}
       </td>
       <td colspan="2" class="d-none d-md-table-cell"><div class="d-flex flex-wrap py-1">${pricesHtml}</div></td>
-      <td>${formatTimestamp(g.created_at)}</td>
-      <td class="text-end">
-        <button type="button" class="btn btn-sm btn-outline-danger" data-produto="${escapeHtml(g.nome_produto)}" aria-label="Excluir produto ${escapeHtml(g.nome_produto)}" onclick="event.stopPropagation(); excluirCalculoGrupo(this.getAttribute('data-produto'))"><i class="bi bi-trash"></i></button>
+      <td class="td-date">${formatTimestamp(g.created_at)}</td>
+      <td class="text-end td-actions">
+        <button type="button" class="btn btn-sm btn-outline-danger" data-produto="${escapeHtml(g.nome_produto)}" aria-label="Excluir produto ${escapeHtml(cleanName)}" onclick="event.stopPropagation(); excluirCalculoGrupo(this.getAttribute('data-produto'))"><i class="bi bi-trash"></i></button>
       </td>
     `;
     tbody.appendChild(tr);
@@ -1237,7 +1308,27 @@ function verCalculoGrupo(key) {
   const g = groupedCalculosCache[key];
   if (!g || g.items.length === 0) return;
 
-  document.getElementById("verCalculoTitulo").textContent = g.nome_produto;
+  const parts = g.nome_produto.split('\u200B');
+  const cleanName = parts[0];
+  const componentesStr = parts[1];
+
+  document.getElementById("verCalculoTitulo").textContent = cleanName;
+
+  const subtituloEl = document.getElementById("verCalculoSubtitulo");
+  if (subtituloEl) {
+    if (g.nome_produto.includes('\u200B')) {
+      if (componentesStr) {
+        subtituloEl.textContent = `Itens: ${componentesStr}`;
+        subtituloEl.classList.remove("d-none");
+      } else {
+        subtituloEl.textContent = "Produto cadastrado como Kit";
+        subtituloEl.classList.remove("d-none");
+      }
+    } else {
+      subtituloEl.classList.add("d-none");
+      subtituloEl.textContent = "";
+    }
+  }
 
   const tabsContainer = document.getElementById("verCalculoTabs");
   
@@ -1247,16 +1338,29 @@ function verCalculoGrupo(key) {
     const valorTaxaPercentual = pVenda * (Number(c.taxa_percentual_usada) / 100);
     const liquido = pVenda - valorTaxaPercentual - Number(c.taxa_fixa_usada) - Number(c.custo_embalagem) - Number(c.custo_operacional);
     const lucroReal = liquido - Number(c.custo_produto);
+    const margemLiquida = pVenda > 0 ? (lucroReal / pVenda) * 100 : 0;
+    const isPrejuizo = lucroReal < 0;
+    const colorClass = isPrejuizo ? "text-danger" : "text-success";
+
+    const verLucroBox = document.getElementById("verLucroBox");
+    if (verLucroBox) {
+      if (isPrejuizo) {
+        verLucroBox.classList.add("sa-lucro-prejuizo");
+      } else {
+        verLucroBox.classList.remove("sa-lucro-prejuizo");
+      }
+    }
 
     if (isPromo) {
       document.getElementById("verPrecoVenda").innerHTML = `<span class="text-muted text-decoration-line-through small me-1">${formatCurrency(c.preco_venda)}</span> <span class="text-danger fw-bold">${formatCurrency(c.preco_promocional)}</span> <span class="badge bg-danger-subtle text-danger ms-1" style="font-size: 0.65rem;">${Number(c.promo_desconto_percentual).toFixed(1)}% OFF</span>`;
+      document.getElementById("verLucro").innerHTML = `<span class="text-muted text-decoration-line-through me-1">${formatCurrency(c.lucro_desejado)}</span> <span class="${colorClass} fw-semibold">${formatCurrency(lucroReal)} (Margem: ${margemLiquida.toFixed(1)}%)</span>`;
       
-      const isPrejuizo = lucroReal < 0;
-      const colorClass = isPrejuizo ? "text-danger" : "text-success";
-      document.getElementById("verLucro").innerHTML = `<span class="text-muted text-decoration-line-through me-1">${formatCurrency(c.lucro_desejado)}</span> <span class="${colorClass} fw-semibold">${formatCurrency(lucroReal)}</span>`;
+      const originalLiquido = Number(c.preco_venda) - (Number(c.preco_venda) * (Number(c.taxa_percentual_usada) / 100)) - Number(c.taxa_fixa_usada) - Number(c.custo_embalagem) - Number(c.custo_operacional);
+      document.getElementById("verLiquido").innerHTML = `<span class="text-muted text-decoration-line-through me-1">${formatCurrency(originalLiquido)}</span> <span class="fw-bold">${formatCurrency(liquido)}</span>`;
     } else {
       document.getElementById("verPrecoVenda").innerHTML = `<span>${formatCurrency(c.preco_venda)}</span>`;
-      document.getElementById("verLucro").innerHTML = `<span>${formatCurrency(c.lucro_desejado)}</span>`;
+      document.getElementById("verLucro").innerHTML = `<span class="${colorClass} fw-semibold">${formatCurrency(lucroReal)} (Margem: ${margemLiquida.toFixed(1)}%)</span>`;
+      document.getElementById("verLiquido").innerHTML = `<span>${formatCurrency(liquido)}</span>`;
     }
 
     document.getElementById("verLoja").textContent = c.lojas_ecommerce?.nome || "Manual";
@@ -1341,7 +1445,7 @@ function verCalculoGrupo(key) {
     const btnExcluirItem = document.getElementById("btnExcluirItemModal");
     if (btnExcluirItem) {
       btnExcluirItem.onclick = async () => {
-        const ok = await confirmDialog(`Excluir a precificação de "${c.nome_produto}" para a loja "${c.lojas_ecommerce?.nome || 'Manual'}"?`, { confirmText: "Excluir" });
+        const ok = await confirmDialog(`Excluir a precificação de "${c.nome_produto.replace(/\u200B/g, "")}" para a loja "${c.lojas_ecommerce?.nome || 'Manual'}"?`, { confirmText: "Excluir" });
         if (!ok) return;
 
         const { error } = await supabaseClient
@@ -1395,7 +1499,7 @@ function verCalculoGrupo(key) {
 }
 
 async function excluirCalculoGrupo(nomeProduto) {
-  const ok = await confirmDialog(`Excluir todos os cálculos do produto "${nomeProduto}" do histórico?`, { confirmText: "Excluir" });
+  const ok = await confirmDialog(`Excluir todos os cálculos do produto "${nomeProduto.replace(/\u200B/g, "")}" do histórico?`, { confirmText: "Excluir" });
   if (!ok) return;
 
   const { error } = await supabaseClient
@@ -1410,6 +1514,119 @@ async function excluirCalculoGrupo(nomeProduto) {
   }
   showToast("Produto excluído do histórico.");
   await loadHistorico();
+}
+
+// Adiciona uma linha de produto componente na lista do kit
+function adicionarLinhaComponente(nomeInicial = "") {
+  const lista = document.getElementById("kitComponentesLista");
+  if (!lista) return;
+
+  const row = document.createElement("div");
+  row.className = "d-flex align-items-center gap-1 position-relative comp-row";
+  
+  row.innerHTML = `
+    <div class="flex-grow-1 position-relative comp-input-wrapper">
+      <input type="text" class="form-control form-control-sm comp-input-field" placeholder="Buscar produto..." autocomplete="off" value="${escapeHtml(nomeInicial)}" style="font-size: 0.75rem;">
+      <div class="dropdown-menu w-100 shadow-sm comp-sugestoes-box" style="max-height: 150px; overflow-y: auto; font-size: 0.75rem;"></div>
+    </div>
+    <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 btn-remover-comp" style="height: 24px; font-size: 0.75rem; line-height: 1.2;">&times;</button>
+  `;
+
+  lista.appendChild(row);
+
+  const inputEl = row.querySelector(".comp-input-field");
+  const boxEl = row.querySelector(".comp-sugestoes-box");
+  const btnRemover = row.querySelector(".btn-remover-comp");
+
+  let timeout;
+  inputEl.addEventListener("input", () => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => {
+      renderSugestoesComponente(inputEl, boxEl);
+    }, 300);
+  });
+
+  btnRemover.addEventListener("click", () => {
+    row.remove();
+    atualizarKitComponentes();
+  });
+}
+
+// Autocomplete para os campos de componentes do kit
+function renderSugestoesComponente(inputEl, boxEl) {
+  const termo = inputEl.value.trim().toLowerCase();
+  
+  // Ignora os prefixos "Kit" e "Combo" da busca
+  const cleanTerm = termo.replace(/^(kit\s*-?\s*|combo\s*-?\s*)/i, "").trim().toLowerCase();
+
+  const matches = cleanTerm
+    ? historicoGruposOrdenados.filter(g => {
+        const nameCleaned = g.nome_produto.replace(/\u200B/g, "").replace(/^(kit\s*-?\s*|combo\s*-?\s*)/i, "").trim().toLowerCase();
+        return nameCleaned.includes(cleanTerm);
+      }).slice(0, 5)
+    : [];
+
+  if (matches.length === 0) {
+    boxEl.classList.remove("show");
+    boxEl.innerHTML = "";
+    return;
+  }
+
+  boxEl.innerHTML = matches.map(g => {
+    const cleanName = g.nome_produto.replace(/\u200B/g, "");
+    return `
+      <button type="button" class="dropdown-item py-1 text-truncate" data-sugestao-name="${escapeHtml(cleanName)}">
+        ${escapeHtml(cleanName)}
+      </button>
+    `;
+  }).join("");
+
+  boxEl.querySelectorAll("[data-sugestao-name]").forEach(btn => {
+    btn.onclick = () => {
+      inputEl.value = btn.dataset.sugestaoName;
+      boxEl.classList.remove("show");
+      atualizarKitComponentes();
+    };
+  });
+
+  boxEl.classList.add("show");
+}
+
+// Atualiza o custo do produto e o nome com base em todos os componentes selecionados
+function atualizarKitComponentes() {
+  const rows = document.querySelectorAll("#kitComponentesLista .comp-row");
+  
+  let totalCusto = 0;
+  const nomesSelecionados = [];
+
+  rows.forEach(row => {
+    const val = row.querySelector(".comp-input-field").value.trim();
+    if (val) {
+      const key = val.toLowerCase();
+      const g = groupedCalculosCache[key];
+      if (g && g.items.length > 0) {
+        totalCusto += Number(g.items[0].custo_produto) || 0;
+        nomesSelecionados.push(g.nome_produto.replace(/\u200B/g, ""));
+      } else {
+        nomesSelecionados.push(val);
+      }
+    }
+  });
+
+  const custoProdutoEl = document.getElementById("calcCustoProduto");
+  if (custoProdutoEl) {
+    custoProdutoEl.value = totalCusto > 0 ? totalCusto.toFixed(2) : "";
+    custoProdutoEl.dispatchEvent(new Event("input"));
+  }
+
+  if (nomesSelecionados.length > 0) {
+    const finalName = nomesSelecionados.join(" + ");
+    const inputNome = document.getElementById("calcNomeProduto");
+    if (inputNome) {
+      inputNome.value = finalName;
+      inputNome.dispatchEvent(new Event("input"));
+    }
+  }
 }
 
 initPrecificacao();

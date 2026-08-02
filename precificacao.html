@@ -38,12 +38,31 @@
 
             <form id="calculadoraForm" class="d-flex flex-column flex-fill">
               <div class="mb-2">
-                <label class="form-label small" for="calcNomeProduto">Nome do produto</label>
-                <div class="position-relative" id="produtoSugestoesWrapper">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <label class="form-label small mb-0" for="calcNomeProduto">Nome do produto</label>
+                  <div class="btn-group" role="group" aria-label="Tipo de produto" style="width: 140px; height: 24px;">
+                    <input type="radio" class="btn-check" name="calcTipoProduto" id="calcTipoUnitario" value="unitario" checked autocomplete="off">
+                    <label class="btn btn-outline-secondary btn-sm py-0 d-flex align-items-center justify-content-center" for="calcTipoUnitario" style="font-size: 0.7rem; cursor: pointer; flex: 1;">Unitário</label>
+
+                    <input type="radio" class="btn-check" name="calcTipoProduto" id="calcTipoKit" value="kit" autocomplete="off">
+                    <label class="btn btn-outline-secondary btn-sm py-0 d-flex align-items-center justify-content-center" for="calcTipoKit" style="font-size: 0.7rem; cursor: pointer; flex: 1;">Kit</label>
+                  </div>
+                </div>
+                <div>
                   <input type="text" class="form-control form-control-sm" id="calcNomeProduto" required autocomplete="off">
-                  <div class="dropdown-menu w-100 shadow-sm" id="produtoSugestoes" style="max-height: 240px; overflow-y: auto;"></div>
                 </div>
                 <div class="small mt-1 d-none" id="produtoExistenteHint"></div>
+              </div>
+
+              <!-- Componentes do Kit (visível apenas quando Tipo = Kit) -->
+              <div id="calcKitComponentesWrapper" class="d-none border rounded p-2 mb-2" style="background-color: rgba(248, 250, 252, 0.5); border-color: var(--sa-border) !important;">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <span class="text-muted small fw-semibold" style="font-size: 0.7rem;">Montar Kit a partir de produtos existentes:</span>
+                  <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none fw-bold" id="btnAdicionarComp" style="font-size: 0.7rem; color: var(--sa-teal-dark);">+ Adicionar produto</button>
+                </div>
+                <div id="kitComponentesLista" class="d-flex flex-column gap-1">
+                  <!-- Inseridos dinamicamente por JS -->
+                </div>
               </div>
 
               <div class="row g-2 mb-2">
@@ -190,11 +209,23 @@
                 <tr><td>Custo do produto</td><td class="text-end" id="resCustoProduto">—</td></tr>
                 <tr><td>Embalagem</td><td class="text-end" id="resEmbalagem">—</td></tr>
                 <tr><td>Custo operacional</td><td class="text-end" id="resOperacional">—</td></tr>
-                <tr><td>Lucro desejado</td><td class="text-end" id="resLucro">—</td></tr>
                 <tr><td>Taxa fixa da loja</td><td class="text-end" id="resTaxaFixa">—</td></tr>
                 <tr><td>Taxa percentual da loja (sobre o preço de venda)</td><td class="text-end" id="resTaxaPercentual">—</td></tr>
-                <tr class="fw-semibold"><td>Valor líquido que você recebe (conferência)</td><td class="text-end" id="resLiquido">—</td></tr>
+              </tbody>
             </table>
+
+            <div class="sa-resumo-calculo">
+              <div class="sa-resumo-item">
+                <span class="sa-resumo-label">Valor líquido a receber (repasse da loja)</span>
+                <span class="sa-resumo-value" id="resLiquido">—</span>
+              </div>
+              <div class="sa-resumo-lucro-box" id="resLucroBox">
+                <div class="d-flex justify-content-between align-items-center">
+                  <span class="sa-resumo-label">Lucro líquido</span>
+                  <span class="sa-resumo-value" id="resLucro">—</span>
+                </div>
+              </div>
+            </div>
 
             <div id="comparacaoPrecoWrapper" class="mt-3 p-3 rounded" style="background-color: var(--sa-bg); border: 1px solid var(--sa-border); min-height: 110px;">
               <div class="text-center text-muted py-2 small">
@@ -213,9 +244,14 @@
           </div>
           <div class="d-flex flex-wrap gap-2 align-items-center w-100 w-md-auto justify-content-md-end">
             <!-- Busca no histórico -->
-            <div class="position-relative flex-grow-1" style="min-width: 260px; max-width: 420px;">
-              <i class="bi bi-search position-absolute top-50 translate-middle-y ms-2 text-muted" style="font-size: 0.85rem;"></i>
-              <input type="search" class="form-control ps-4" id="historicoBusca" placeholder="Buscar produto..." autocomplete="off">
+            <div class="d-flex gap-2 align-items-center flex-grow-1" style="min-width: 260px; max-width: 450px;">
+              <div class="position-relative flex-grow-1">
+                <i class="bi bi-search position-absolute top-50 translate-middle-y ms-2 text-muted" style="font-size: 0.85rem;"></i>
+                <input type="search" class="form-control ps-4" id="historicoBusca" placeholder="Buscar produto..." autocomplete="off">
+              </div>
+              <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1 text-nowrap py-2" id="btnFiltroKits" title="Mostrar apenas kits e combos">
+                <i class="bi bi-boxes"></i> Kits / Combos
+              </button>
             </div>
             <!-- Selector para itens por página -->
             <div class="d-flex align-items-center gap-1">
@@ -236,9 +272,9 @@
           </div>
         </div>
         <div class="table-responsive table-list-min">
-          <table class="table table-sa">
+          <table class="table table-sa table-responsive-mobile">
             <thead>
-              <tr><th>Produto</th><th>Loja</th><th>Preço de venda</th><th>Data</th><th></th></tr>
+              <tr><th>Produto</th><th>Loja</th><th>Preço de venda</th><th>Data</th><th class="text-end"></th></tr>
             </thead>
             <tbody id="historicoTableBody"></tbody>
           </table>
@@ -316,9 +352,12 @@
 <div class="modal fade" id="verCalculoModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
-      <div class="modal-header">
-        <h2 class="h6 modal-title" id="verCalculoTitulo">Cálculo</h2>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      <div class="modal-header d-flex flex-column align-items-start py-2">
+        <div class="d-flex justify-content-between align-items-center w-100">
+          <h2 class="h6 modal-title mb-0" id="verCalculoTitulo">Cálculo</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div id="verCalculoSubtitulo" class="small text-muted mt-1 d-none" style="font-size: 0.75rem;"></div>
       </div>
       <div class="modal-body">
         <!-- Abas para alternar a loja visualizada no modal -->
@@ -341,13 +380,26 @@
             <tr><td>Custo do produto</td><td class="text-end" id="verCustoProduto">—</td></tr>
             <tr><td>Embalagem</td><td class="text-end" id="verEmbalagem">—</td></tr>
             <tr><td>Custo operacional</td><td class="text-end" id="verOperacional">—</td></tr>
-            <tr><td>Lucro desejado</td><td class="text-end" id="verLucro">—</td></tr>
             <tr><td>Taxa fixa da loja</td><td class="text-end" id="verTaxaFixa">—</td></tr>
             <tr><td>Taxa percentual da loja</td><td class="text-end" id="verTaxaPercentual">—</td></tr>
             <tr id="verPrecoReferenciaRow" class="d-none"><td>Preço de referência</td><td class="text-end" id="verPrecoReferencia">—</td></tr>
             <tr id="verDiferencaRow" class="d-none"><td>Diferença concorrente</td><td class="text-end" id="verDiferenca">—</td></tr>
           </tbody>
         </table>
+
+        <div class="sa-resumo-calculo">
+          <div class="sa-resumo-item">
+            <span class="sa-resumo-label">Valor líquido a receber (repasse da loja)</span>
+            <span class="sa-resumo-value" id="verLiquido">—</span>
+          </div>
+          <div class="sa-resumo-lucro-box" id="verLucroBox">
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="sa-resumo-label">Lucro líquido</span>
+              <span class="sa-resumo-value" id="verLucro">—</span>
+            </div>
+          </div>
+        </div>
+
         <div class="mt-3 d-flex gap-2 flex-wrap" id="verLinksWrapper"></div>
       </div>
       <div class="modal-footer d-flex justify-content-between align-items-center">
