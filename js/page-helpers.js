@@ -96,30 +96,7 @@ async function withLoadingButton(submitBtn, loadingText, fn) {
 }
 
 function setupThemeToggleListener() {
-  const btn = document.getElementById("btnThemeToggle");
-  const mobileBtn = document.getElementById("btnMobileThemeToggle");
-  if (!btn && !mobileBtn) return;
-  
-  const updateToggleIcon = (isDark) => {
-    const icon = document.getElementById("themeToggleIcon");
-    if (icon) {
-      icon.className = isDark ? "bi bi-sun text-warning" : "bi bi-moon";
-    }
-    const mobileIcon = document.getElementById("mobileThemeToggleIcon");
-    if (mobileIcon) {
-      mobileIcon.className = isDark ? "bi bi-sun text-warning" : "bi bi-moon";
-    }
-  };
-
-  const isDarkInitial = document.documentElement.classList.contains("dark-theme");
-  updateToggleIcon(isDarkInitial);
-
-  const toggle = () => {
-    const isDark = document.documentElement.classList.toggle("dark-theme");
-    localStorage.setItem("sa_theme", isDark ? "dark" : "light");
-    updateToggleIcon(isDark);
-  };
-
-  if (btn) btn.onclick = toggle;
-  if (mobileBtn) mobileBtn.onclick = toggle;
+  // Força o tema claro desativando qualquer resquício do tema escuro
+  localStorage.setItem("sa_theme", "light");
+  document.documentElement.classList.remove("dark-theme");
 }

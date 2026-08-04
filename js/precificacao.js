@@ -940,13 +940,19 @@ document.getElementById("salvarCalculoBtn")?.addEventListener("click", async (e)
 
   const btn = e.currentTarget;
   await withLoadingButton(btn, "Salvando...", async () => {
-    // Coleta os componentes da lista
+    // Coleta os componentes da lista com seus respectivos custos
     const rows = document.querySelectorAll("#kitComponentesLista .comp-row");
     const componentes = [];
     rows.forEach(row => {
       const val = row.querySelector(".comp-input-field").value.trim();
       if (val) {
-        componentes.push(val);
+        const badge = row.querySelector(".comp-custo-badge");
+        const custo = badge ? Number(badge.dataset.custo) || 0 : 0;
+        if (custo > 0) {
+          componentes.push(`${val}:${custo.toFixed(2)}`);
+        } else {
+          componentes.push(val);
+        }
       }
     });
 
@@ -1164,6 +1170,10 @@ function preencherFormularioComCalculo(c) {
     if (inputPromoPreco) inputPromoPreco.value = "";
   }
 
+  if ((c.nome_produto || "").includes('\u200B')) {
+    atualizarKitComponentes();
+  }
+
   atualizarResultado();
 }
 
@@ -1277,7 +1287,7 @@ function renderHistoricoPagina() {
     
     let compHtml = "";
     if (componentesStr) {
-      compHtml = `<div class="text-muted small mt-0.5" style="font-size: 0.65rem;">Itens: ${escapeHtml(componentesStr)}</div>`;
+      compHtml = `<div class="text-muted small mt-0.5" style="font-size: 0.65rem;">Itens: ${escapeHtml(formatComponentesParaExibicao(componentesStr))}</div>`;
     }
 
     const mobilePricesHtml = `<div class="d-block d-md-none mt-2 pt-2 border-top border-light" style="border-top-style: dashed !important;">${pricesHtml}</div>`;
@@ -1318,7 +1328,7 @@ function verCalculoGrupo(key) {
   if (subtituloEl) {
     if (g.nome_produto.includes('\u200B')) {
       if (componentesStr) {
-        subtituloEl.textContent = `Itens: ${componentesStr}`;
+        subtituloEl.textContent = `Itens: ${formatComponentesParaExibicao(componentesStr)}`;
         subtituloEl.classList.remove("d-none");
       } else {
         subtituloEl.textContent = "Produto cadastrado como Kit";
@@ -1516,7 +1526,6 @@ async function excluirCalculoGrupo(nomeProduto) {
   await loadHistorico();
 }
 
-// Adiciona uma linha de produto componente na lista do kit
 function adicionarLinhaComponente(nomeInicial = "") {
   const lista = document.getElementById("kitComponentesLista");
   if (!lista) return;
@@ -1524,11 +1533,38 @@ function adicionarLinhaComponente(nomeInicial = "") {
   const row = document.createElement("div");
   row.className = "d-flex align-items-center gap-1 position-relative comp-row";
   
+  let nome = nomeInicial;
+  let custo = 0;
+  let custoStr = "";
+
+  const colonIdx = nomeInicial.lastIndexOf(":");
+  if (colonIdx !== -1) {
+    const possibleCost = nomeInicial.substring(colonIdx + 1).trim();
+    if (!isNaN(possibleCost) && possibleCost !== "") {
+      nome = nomeInicial.substring(0, colonIdx).trim();
+      custo = Number(possibleCost);
+      custoStr = `R$ ${custo.toFixed(2).replace(".", ",")}`;
+    }
+  }
+
+  if (nome && !custoStr) {
+    const key = nome.toLowerCase();
+    const g = groupedCalculosCache[key];
+    if (g && g.items.length > 0) {
+      custo = Number(g.items[0].custo_produto) || 0;
+      custoStr = `R$ ${custo.toFixed(2).replace(".", ",")}`;
+    }
+  }
+
+  const badgeText = custoStr || (nome ? "S/ Histórico" : "");
+  const badgeClass = nome ? "" : "d-none";
+
   row.innerHTML = `
     <div class="flex-grow-1 position-relative comp-input-wrapper">
-      <input type="text" class="form-control form-control-sm comp-input-field" placeholder="Buscar produto..." autocomplete="off" value="${escapeHtml(nomeInicial)}" style="font-size: 0.75rem;">
+      <input type="text" class="form-control form-control-sm comp-input-field" placeholder="Buscar produto..." autocomplete="off" value="${escapeHtml(nome)}" style="font-size: 0.75rem;">
       <div class="dropdown-menu w-100 shadow-sm comp-sugestoes-box" style="max-height: 150px; overflow-y: auto; font-size: 0.75rem;"></div>
     </div>
+    <span class="badge bg-light text-dark border comp-custo-badge ${badgeClass}" data-custo="${custo}" style="height: 24px; font-size: 0.7rem; display: flex; align-items: center; justify-content: center; min-width: 65px; white-space: nowrap;">${badgeText}</span>
     <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 btn-remover-comp" style="height: 24px; font-size: 0.75rem; line-height: 1.2;">&times;</button>
   `;
 
@@ -1540,6 +1576,29 @@ function adicionarLinhaComponente(nomeInicial = "") {
 
   let timeout;
   inputEl.addEventListener("input", () => {
+    const val = inputEl.value.trim();
+    const badge = row.querySelector(".comp-custo-badge");
+    if (!val) {
+      if (badge) {
+        badge.dataset.custo = "0";
+        badge.textContent = "";
+        badge.classList.add("d-none");
+      }
+    } else {
+      if (badge) {
+        const key = val.toLowerCase();
+        const g = groupedCalculosCache[key];
+        if (g && g.items.length > 0) {
+          const c = Number(g.items[0].custo_produto) || 0;
+          badge.dataset.custo = c;
+          badge.textContent = `R$ ${c.toFixed(2).replace(".", ",")}`;
+        } else {
+          badge.dataset.custo = "0";
+          badge.textContent = "S/ Histórico";
+        }
+        badge.classList.remove("d-none");
+      }
+    }
     clearTimeout(timeout);
     timeout = setTimeout(() => {
       renderSugestoesComponente(inputEl, boxEl);
@@ -1552,11 +1611,9 @@ function adicionarLinhaComponente(nomeInicial = "") {
   });
 }
 
-// Autocomplete para os campos de componentes do kit
 function renderSugestoesComponente(inputEl, boxEl) {
   const termo = inputEl.value.trim().toLowerCase();
   
-  // Ignora os prefixos "Kit" e "Combo" da busca
   const cleanTerm = termo.replace(/^(kit\s*-?\s*|combo\s*-?\s*)/i, "").trim().toLowerCase();
 
   const matches = cleanTerm
@@ -1583,8 +1640,27 @@ function renderSugestoesComponente(inputEl, boxEl) {
 
   boxEl.querySelectorAll("[data-sugestao-name]").forEach(btn => {
     btn.onclick = () => {
-      inputEl.value = btn.dataset.sugestaoName;
+      const selectedName = btn.dataset.sugestaoName;
+      inputEl.value = selectedName;
       boxEl.classList.remove("show");
+      
+      const key = selectedName.toLowerCase();
+      const g = groupedCalculosCache[key];
+      const row = inputEl.closest(".comp-row");
+      const badge = row ? row.querySelector(".comp-custo-badge") : null;
+      if (badge) {
+        if (g && g.items.length > 0) {
+          const custo = Number(g.items[0].custo_produto) || 0;
+          badge.dataset.custo = custo;
+          badge.textContent = `R$ ${custo.toFixed(2).replace(".", ",")}`;
+          badge.classList.remove("d-none");
+        } else {
+          badge.dataset.custo = "0";
+          badge.textContent = "S/ Histórico";
+          badge.classList.remove("d-none");
+        }
+      }
+      
       atualizarKitComponentes();
     };
   });
@@ -1592,7 +1668,6 @@ function renderSugestoesComponente(inputEl, boxEl) {
   boxEl.classList.add("show");
 }
 
-// Atualiza o custo do produto e o nome com base em todos os componentes selecionados
 function atualizarKitComponentes() {
   const rows = document.querySelectorAll("#kitComponentesLista .comp-row");
   
@@ -1602,16 +1677,17 @@ function atualizarKitComponentes() {
   rows.forEach(row => {
     const val = row.querySelector(".comp-input-field").value.trim();
     if (val) {
-      const key = val.toLowerCase();
-      const g = groupedCalculosCache[key];
-      if (g && g.items.length > 0) {
-        totalCusto += Number(g.items[0].custo_produto) || 0;
-        nomesSelecionados.push(g.nome_produto.replace(/\u200B/g, ""));
-      } else {
-        nomesSelecionados.push(val);
-      }
+      const badge = row.querySelector(".comp-custo-badge");
+      const custo = badge ? Number(badge.dataset.custo) || 0 : 0;
+      totalCusto += custo;
+      nomesSelecionados.push(val);
     }
   });
+
+  const totalValorEl = document.getElementById("kitTotalizadorValor");
+  if (totalValorEl) {
+    totalValorEl.textContent = `R$ ${totalCusto.toFixed(2).replace(".", ",")}`;
+  }
 
   const custoProdutoEl = document.getElementById("calcCustoProduto");
   if (custoProdutoEl) {
@@ -1627,6 +1703,14 @@ function atualizarKitComponentes() {
       inputNome.dispatchEvent(new Event("input"));
     }
   }
+}
+
+function formatComponentesParaExibicao(componentesStr) {
+  if (!componentesStr) return "";
+  return componentesStr.replace(/:([0-9.]+)/g, (match, p1) => {
+    const val = Number(p1);
+    return isNaN(val) ? "" : ` (R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`;
+  });
 }
 
 initPrecificacao();
