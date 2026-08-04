@@ -15,7 +15,7 @@
 // terminar. Guardamos o HTML da sidebar em sessionStorage: da segunda
 // navegação em diante ela é desenhada na hora (sem esperar rede), e o fetch
 // roda por trás só para manter o cache atualizado para a próxima página.
-const SIDEBAR_CACHE_KEY = "sa_sidebar_html_v1";
+const SIDEBAR_CACHE_KEY = "sa_sidebar_html_v2";
 
 async function injectSidebar(activePage) {
   const mount = document.getElementById("sidebarMount");
