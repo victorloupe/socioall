@@ -70,16 +70,16 @@
 
               <div class="row g-2 mb-2">
                 <div class="col-12 col-sm-4">
-                  <label class="form-label small" for="calcLinkVenda">Link de venda</label>
-                  <input type="url" class="form-control form-control-sm" id="calcLinkVenda" placeholder="Seu anúncio (opcional)">
+                  <label class="form-label small mb-1" for="calcLinkVenda">Link de venda</label>
+                  <input type="url" class="form-control form-control-sm" id="calcLinkVenda" placeholder="Seu anúncio">
                 </div>
                 <div class="col-12 col-sm-4">
-                  <label class="form-label small" for="calcLinkReferencia">Link de referência</label>
-                  <input type="url" class="form-control form-control-sm" id="calcLinkReferencia" placeholder="Base de comparação (opcional)">
+                  <label class="form-label small mb-1" for="calcLinkReferencia">Link de referência</label>
+                  <input type="url" class="form-control form-control-sm" id="calcLinkReferencia" placeholder="Concorrente / ref.">
                 </div>
                 <div class="col-12 col-sm-4">
-                  <label class="form-label small" for="calcPrecoReferencia">Preço de referência (R$)</label>
-                  <input type="number" step="0.01" min="0" class="form-control form-control-sm" id="calcPrecoReferencia" placeholder="Preço concorrente (opcional)">
+                  <label class="form-label small mb-1" for="calcPrecoReferencia">Preço de referência (R$)</label>
+                  <input type="number" step="0.01" min="0" class="form-control form-control-sm" id="calcPrecoReferencia" placeholder="Ex: 49,90">
                 </div>
               </div>
 
@@ -138,6 +138,30 @@
                     Ajustar taxas automaticamente pelas faixas de preço
                   </label>
                 </div>
+
+                <!-- Seletor de Plano Amazon (visível quando Amazon está selecionada) -->
+                <div id="amazonPlanoWrapper" class="d-none p-2 mt-2 rounded border" style="background-color: rgba(240, 247, 255, 0.7); border-color: #BFDBFE !important;">
+                  <div class="d-flex justify-content-between align-items-center mb-1.5">
+                    <span class="small fw-semibold text-dark" style="font-size: 0.75rem;">
+                      <i class="bi bi-shield-check text-primary me-1"></i>Seu Plano na Amazon:
+                    </span>
+                    <span class="badge bg-primary text-white" style="font-size: 0.65rem;" id="amazonPlanoStatusBadge">Salvo na sua conta</span>
+                  </div>
+                  <div class="btn-group w-100" role="group" aria-label="Plano de Venda Amazon">
+                    <input type="radio" class="btn-check" name="amazonPlanoRadio" id="amazonPlanoProfissional" value="profissional" checked autocomplete="off">
+                    <label class="btn btn-outline-primary btn-sm py-1 d-flex flex-column align-items-center justify-content-center" for="amazonPlanoProfissional" style="font-size: 0.73rem; cursor: pointer;">
+                      <span class="fw-bold">Profissional</span>
+                      <span class="small opacity-75" style="font-size: 0.65rem;">R$ 0 taxa fixa / item</span>
+                    </label>
+
+                    <input type="radio" class="btn-check" name="amazonPlanoRadio" id="amazonPlanoIndividual" value="individual" autocomplete="off">
+                    <label class="btn btn-outline-primary btn-sm py-1 d-flex flex-column align-items-center justify-content-center" for="amazonPlanoIndividual" style="font-size: 0.73rem; cursor: pointer;">
+                      <span class="fw-bold">Individual</span>
+                      <span class="small opacity-75" style="font-size: 0.65rem;">+ R$ 2,00 por item</span>
+                    </label>
+                  </div>
+                </div>
+
                 <div id="lojaFaixasContainer" class="mt-2">
                   <!-- Badges/faixas serão renderizadas aqui -->
                 </div>
@@ -301,51 +325,96 @@
 <div class="modal fade" id="lojasModal" tabindex="-1">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
-      <div class="modal-header">
-        <h2 class="h6 modal-title">Lojas / marketplaces</h2>
+      <div class="modal-header d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-2">
+          <h2 class="h6 modal-title mb-0">Lojas / marketplaces</h2>
+          <span class="badge bg-light text-muted border small fw-normal">Configuração de Taxas</span>
+        </div>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
       </div>
       <div class="modal-body">
-        <p class="text-muted small">Taxas de comissão pesquisadas como ponto de partida — os marketplaces mudam a política com frequência, então confira e ajuste sempre que precisar.</p>
+        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2 mb-3 bg-light p-2.5 rounded border">
+          <div class="small text-muted" style="line-height: 1.35;">
+            Taxas de referência para <strong>Utilidades Domésticas</strong>. Você pode personalizar as taxas de cada loja ou sincronizar as recomendações atualizadas de 2026.
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-primary text-nowrap" id="btnRestaurarLojasPadrao">
+            <i class="bi bi-arrow-repeat me-1"></i>Restaurar taxas 2026
+          </button>
+        </div>
+
         <div class="table-responsive mb-4">
           <table class="table table-sa table-sm table-stack-mobile">
-            <thead><tr><th>Nome</th><th>Taxa %</th><th>Taxa fixa (R$)</th><th>Observações</th><th>Atualizado em</th><th></th></tr></thead>
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Taxa %</th>
+                <th>Taxa fixa (R$)</th>
+                <th>Observações</th>
+                <th>Atualizado em</th>
+                <th class="text-end">Ações</th>
+              </tr>
+            </thead>
             <tbody id="lojasTableBody"></tbody>
           </table>
         </div>
 
-        <h3 class="h6 mb-3" id="lojaFormTitulo">Adicionar loja</h3>
-        <form id="novaLojaForm">
-          <input type="hidden" id="lojaEditId" value="">
-          <div class="row g-2">
-            <div class="col-12 col-sm-4">
-              <label class="form-label small" for="lojaNome">Nome</label>
-              <input type="text" class="form-control" id="lojaNome" required>
-            </div>
-            <div class="col-6 col-sm-2">
-              <label class="form-label small" for="lojaTaxaPercentual">Taxa %</label>
-              <input type="number" step="0.01" min="0" max="99.99" class="form-control" id="lojaTaxaPercentual" value="0" required>
-            </div>
-            <div class="col-6 col-sm-2">
-              <label class="form-label small" for="lojaTaxaFixa">Taxa fixa (R$)</label>
-              <input type="number" step="0.01" min="0" class="form-control" id="lojaTaxaFixa" value="0" required>
-            </div>
-            <div class="col-12 col-sm-4">
-              <label class="form-label small" for="lojaLinkReferencia">Link de referência (opcional)</label>
-              <input type="url" class="form-control" id="lojaLinkReferencia" placeholder="Página de taxas da loja">
-            </div>
-            <div class="col-12">
-              <label class="form-label small" for="lojaObservacoes">Observações (opcional)</label>
-              <input type="text" class="form-control" id="lojaObservacoes" placeholder="Ex: taxa varia por categoria/faixa de preço">
-            </div>
+        <div class="border-top pt-3">
+          <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center mb-2 gap-1">
+            <h3 class="h6 mb-0" id="lojaFormTitulo">Adicionar loja</h3>
+            <span class="text-muted small" style="font-size: 0.72rem;">Clique em um modelo para preencher rapidamente:</span>
           </div>
-          <div class="d-flex gap-2 mt-3">
-            <button type="submit" class="btn btn-primary" id="lojaSubmitBtn">
-              <i class="bi bi-plus-lg me-1"></i>Adicionar loja
+
+          <!-- Modelos Rápidos -->
+          <div class="d-flex flex-wrap gap-1 mb-3" id="lojaModelosRapidos">
+            <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" style="font-size: 0.72rem;" data-loja-preset="shopee">
+              <span class="fw-semibold">Shopee:</span> 20% + R$ 4,00
             </button>
-            <button type="button" class="btn btn-outline-secondary d-none" id="lojaCancelEditBtn">Cancelar edição</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" style="font-size: 0.72rem;" data-loja-preset="ml_classico">
+              <span class="fw-semibold">Mercado Livre Clássico:</span> 12% + R$ 6,00
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" style="font-size: 0.72rem;" data-loja-preset="ml_premium">
+              <span class="fw-semibold">Mercado Livre Premium:</span> 16,5% + R$ 6,00
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" style="font-size: 0.72rem;" data-loja-preset="amazon">
+              <span class="fw-semibold">Amazon:</span> 15% + R$ 0,00 (8% até R$30)
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" style="font-size: 0.72rem;" data-loja-preset="tiktok">
+              <span class="fw-semibold">TikTok Shop:</span> 12% + R$ 6,00
+            </button>
           </div>
-        </form>
+
+          <form id="novaLojaForm">
+            <input type="hidden" id="lojaEditId" value="">
+            <div class="row g-2">
+              <div class="col-12 col-sm-4">
+                <label class="form-label small" for="lojaNome">Nome</label>
+                <input type="text" class="form-control form-control-sm" id="lojaNome" placeholder="Ex: Amazon" required>
+              </div>
+              <div class="col-6 col-sm-2">
+                <label class="form-label small" for="lojaTaxaPercentual">Taxa %</label>
+                <input type="number" step="0.01" min="0" max="99.99" class="form-control form-control-sm" id="lojaTaxaPercentual" value="0" required>
+              </div>
+              <div class="col-6 col-sm-2">
+                <label class="form-label small" for="lojaTaxaFixa">Taxa fixa (R$)</label>
+                <input type="number" step="0.01" min="0" class="form-control form-control-sm" id="lojaTaxaFixa" value="0" required>
+              </div>
+              <div class="col-12 col-sm-4">
+                <label class="form-label small" for="lojaLinkReferencia">Link de referência (opcional)</label>
+                <input type="url" class="form-control form-control-sm" id="lojaLinkReferencia" placeholder="Página de taxas da loja">
+              </div>
+              <div class="col-12">
+                <label class="form-label small" for="lojaObservacoes">Observações (opcional)</label>
+                <input type="text" class="form-control form-control-sm" id="lojaObservacoes" placeholder="Ex: comissão da categoria, regras de frete e custos fixos">
+              </div>
+            </div>
+            <div class="d-flex gap-2 mt-3">
+              <button type="submit" class="btn btn-primary btn-sm" id="lojaSubmitBtn">
+                <i class="bi bi-plus-lg me-1"></i>Adicionar loja
+              </button>
+              <button type="button" class="btn btn-outline-secondary btn-sm d-none" id="lojaCancelEditBtn">Cancelar edição</button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   </div>

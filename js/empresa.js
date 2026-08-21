@@ -219,7 +219,7 @@ async function loadSocios() {
     const tr = document.createElement("tr");
     const nomeSeguro = escapeHtml(s.nome);
     tr.innerHTML = `
-      <td>${nomeSeguro}</td>
+      <td>${renderSocioBadge(s.nome)}</td>
       <td>${escapeHtml(emailToUsername(s.email) || "—")}</td>
       <td>${Number(s.percentual).toFixed(1)}%</td>
       <td class="text-end text-nowrap">
@@ -444,7 +444,7 @@ async function loadAuditLog() {
     const acaoBadge = item.acao === "delete" ? "badge-despesa" : (item.acao === "insert" ? "badge-receita" : "");
     tr.innerHTML = `
       <td class="small text-muted">${formatTimestamp(item.created_at, { comHora: true })}</td>
-      <td>${escapeHtml(item.socios?.nome || "—")}</td>
+      <td>${renderSocioBadge(item.socios?.nome)}</td>
       <td>${AUDIT_TABELA_LABEL[item.tabela] || escapeHtml(item.tabela)}: ${descreverAuditItem(item)}</td>
       <td>${acaoBadge ? `<span class="badge ${acaoBadge}">${AUDIT_ACAO_LABEL[item.acao] || item.acao}</span>` : (AUDIT_ACAO_LABEL[item.acao] || item.acao)}</td>
     `;

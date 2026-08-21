@@ -93,7 +93,7 @@ async function loadRelatorio({ recalcularResumo = false } = {}) {
       <td>${formatDate(l.data)}</td>
       <td>${escapeHtml(l.descricao)}</td>
       <td><span class="badge ${badgeClass}">${l.tipo}</span></td>
-      <td>${escapeHtml(l.socios?.nome || "—")}</td>
+      <td>${renderSocioBadge(l.socios?.nome)}</td>
       <td>${formatCurrency(l.valor)}</td>
     `;
     tbody.appendChild(tr);

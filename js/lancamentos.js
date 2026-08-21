@@ -190,7 +190,7 @@ async function loadLancamentos() {
     const badgeClass = l.tipo === "receita" ? "badge-receita" : "badge-despesa";
     const sinal = l.tipo === "receita" ? "+" : "-";
     const valorClass = l.tipo === "receita" ? "value-positive" : "value-negative";
-    const nomeSocio = escapeHtml(l.socios?.nome || "—");
+    const socioBadgeHtml = renderSocioBadge(l.socios?.nome);
     const comprovanteBtn = l.lancamento_comprovantes?.length
       ? `<button class="btn btn-sm btn-outline-secondary" title="Ver comprovantes" aria-label="Ver comprovantes" onclick="verComprovantes('${l.id}')"><i class="bi bi-paperclip"></i>${l.lancamento_comprovantes.length > 1 ? ` ${l.lancamento_comprovantes.length}` : ""}</button>`
       : "";
@@ -205,7 +205,7 @@ async function loadLancamentos() {
       <td class="d-none d-md-table-cell">${formatDate(l.data)}</td>
       <td class="d-none d-md-table-cell">${escapeHtml(l.descricao)}</td>
       <td class="d-none d-md-table-cell"><span class="badge ${badgeClass}">${l.tipo}</span></td>
-      <td class="d-none d-md-table-cell">${nomeSocio}</td>
+      <td class="d-none d-md-table-cell">${socioBadgeHtml}</td>
       <td class="d-none d-md-table-cell ${valorClass}">${sinal} ${formatCurrency(l.valor)}</td>
       <td class="d-none d-md-table-cell text-center">${comprovanteBtn}</td>
       <td class="d-none d-md-table-cell text-end text-nowrap">${editarBtn}${excluirBtn}</td>
@@ -219,7 +219,7 @@ async function loadLancamentos() {
           <div class="lanc-meta">
             <span class="badge ${badgeClass}">${l.tipo}</span>
             <span class="lanc-meta-sep">·</span>
-            <span>${nomeSocio}</span>
+            <span>${socioBadgeHtml}</span>
             <span class="lanc-meta-sep">·</span>
             <span>${formatDate(l.data)}</span>
           </div>

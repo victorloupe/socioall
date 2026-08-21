@@ -54,7 +54,7 @@ function renderDivisaoTable(socios, lucro) {
     const parte = lucro * (Number(s.percentual) / 100);
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td class="summary-name">${escapeHtml(s.nome)}</td>
+      <td class="summary-name">${renderSocioBadge(s.nome)}</td>
       <td data-label="Percentual">${Number(s.percentual).toFixed(1)}%</td>
       <td class="${parte >= 0 ? 'value-positive' : 'value-negative'}" data-label="Valor a receber">${formatCurrency(parte)}</td>
     `;
@@ -95,7 +95,7 @@ function renderDespesasSociosTable(socios, lancamentos, totalDespesas) {
     const percDespesas = totalDespesas > 0 ? (valorPago / totalDespesas) * 100 : 0;
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td class="summary-name">${escapeHtml(s.nome)}</td>
+      <td class="summary-name">${renderSocioBadge(s.nome)}</td>
       <td data-label="Total pago">${formatCurrency(valorPago)}</td>
       <td class="text-muted" data-label="% das despesas">${percDespesas.toFixed(1)}%</td>
     `;
@@ -107,7 +107,7 @@ function renderDespesasSociosTable(socios, lancamentos, totalDespesas) {
     const tr = document.createElement("tr");
     tr.className = "text-muted table-light";
     tr.innerHTML = `
-      <td class="summary-name"><em>Caixa Geral (Empresa)</em></td>
+      <td class="summary-name"><span class="sa-socio-badge sa-socio-color-neutral"><span class="sa-socio-dot"></span><span>Caixa Geral (Empresa)</span></span></td>
       <td data-label="Total pago">${formatCurrency(totalGeralEmpresa)}</td>
       <td class="text-muted" data-label="% das despesas">${percDespesas.toFixed(1)}%</td>
     `;
@@ -161,7 +161,7 @@ function renderAcertoSocios(socios, lancamentos, lucro) {
   saldos.forEach(s => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td class="summary-name">${escapeHtml(s.nome)}</td>
+      <td class="summary-name">${renderSocioBadge(s.nome)}</td>
       <td data-label="Parte no resultado">${formatCurrency(s.parteJusta)}</td>
       <td data-label="Pagou/recebeu de fato">${formatCurrency(s.contribuiuDeFato)}</td>
       <td class="${s.saldo >= 0 ? "value-positive" : "value-negative"} fw-semibold" data-label="Saldo">

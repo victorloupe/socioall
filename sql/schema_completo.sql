@@ -499,14 +499,14 @@ begin
 
   insert into lojas_ecommerce (empresa_id, nome, taxa_percentual, taxa_fixa, observacoes)
   values
-    (p_empresa_id, 'Shopee', 14, 20,
-     'Taxa por faixa de preço (vendedor CNPJ): até R$79,99 = 20%+R$4; R$80–99,99 = 14%+R$16; R$100–199,99 = 14%+R$20; acima de R$200 = 14%+R$26. Ajuste conforme a faixa do seu produto.'),
+    (p_empresa_id, 'Shopee', 20, 4,
+     'Taxa por faixa de preço (com Programa de Frete Grátis): até R$79,99 = 20%+R$4; R$80–99,99 = 14%+R$16; R$100–199,99 = 14%+R$20; acima de R$200 = 14%+R$26. Ajuste conforme o valor do produto.'),
     (p_empresa_id, 'TikTok Shop', 12, 6,
-     'Taxa por faixa de preço: até R$49,99 = 16% (sem taxa fixa); a partir de R$50,00 = 12%+R$6,00. Valores já incluem 6% do programa de frete grátis. Ajuste conforme a sua conta.'),
+     'Taxa por faixa de preço: até R$49,99 = 10%+R$4,00 (ou 16% frete grátis); a partir de R$50,00 = 12%+R$6,00. Valores já incluem o programa de frete grátis.'),
     (p_empresa_id, 'Mercado Livre', 12, 6,
-     'Anúncio Clássico: 10–14%. Premium: 15–19%. Produtos até R$79 pagam também custo fixo por unidade (~R$5,50–R$6,00+). Confira a taxa exata da categoria do seu produto no Seller Center.'),
-    (p_empresa_id, 'Amazon', 15, 0,
-     'Comissão de Casa e Cozinha (utilidades domésticas): 15%, caindo para 8% em itens de até R$29,99, com mínimo de R$1,00 por venda. Plano Profissional: R$19,00/mês e nenhuma tarifa por item — rateie a mensalidade no custo operacional. Plano Individual: R$2,00 por item vendido — nesse caso preencha a taxa fixa com 2,00. O frete (DBA/FBA) é cobrado à parte, por peso e dimensão.')
+     'Utilidades Domésticas: Clássico (12%+R$6 até R$78,99; 12%+R$0 a partir de R$79). Premium (16,5%+R$6 até R$78,99; 16,5%+R$0 a partir de R$79).'),
+    (p_empresa_id, 'Amazon', 12, 0,
+     'Casa, Cozinha e Utilidades Domésticas: 12% de comissão (tarifa mínima R$1,00). Plano Profissional: R$0 taxa fixa por item. Plano Individual: R$2,00 por item.')
   on conflict (empresa_id, lower(nome)) do nothing;
 end;
 $$;

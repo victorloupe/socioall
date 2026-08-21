@@ -163,6 +163,37 @@ async function initPrecificacao() {
     atualizarResultado();
   });
 
+  // Listener para persistir o Plano de Venda da Amazon (Profissional vs Individual)
+  document.querySelectorAll('input[name="amazonPlanoRadio"]').forEach(radio => {
+    radio.addEventListener("change", async (e) => {
+      const plano = e.target.value;
+      localStorage.setItem(`sa_amazon_plano_${currentEmpresaId}`, plano);
+      
+      const taxaFixa = plano === "individual" ? 2 : 0;
+      const lojaAmazon = lojasCache.find(l => l.nome.trim().toLowerCase() === "amazon");
+      if (lojaAmazon) {
+        lojaAmazon.taxa_fixa = taxaFixa;
+        lojaAmazon.observacoes = plano === "individual" 
+          ? "Plano Individual: +R$2,00 por item vendido. Sem mensalidade." 
+          : "Plano Profissional: R$0 taxa fixa por item. Mensalidade R$19,00.";
+          
+        await supabaseClient.from("lojas_ecommerce").update({
+          taxa_fixa: taxaFixa,
+          observacoes: lojaAmazon.observacoes
+        }).eq("id", lojaAmazon.id);
+      }
+
+      showToast(`Plano da Amazon salvo: ${plano === "individual" ? "Individual (+R$ 2,00 por item)" : "Profissional (R$ 0 taxa fixa)"}`);
+      
+      const lojaAtiva = lojasCache.find(l => l.id === selectedLojaId);
+      if (lojaAtiva && lojaAtiva.nome.trim().toLowerCase() === "amazon") {
+        document.getElementById("calcTaxaFixa").value = taxaFixa;
+      }
+      
+      atualizarResultado();
+    });
+  });
+
   await loadLojas();
   await loadHistorico();
 }
@@ -378,104 +409,190 @@ const LOJAS_FAIXAS = {
   ],
   "tiktok shop": [
     { nome: "Faixa 1 (Até R$49,99)", min: 0, max: 49.99, taxaPercentual: 10, taxaFixa: 4 },
-    { nome: "Faixa 2 (A partir de R$50,00)", min: 50.00, max: Infinity, taxaPercentual: 6, taxaFixa: 6 }
+    { nome: "Faixa 2 (A partir de R$50,00)", min: 50.00, max: Infinity, taxaPercentual: 12, taxaFixa: 6 }
   ],
   "mercado livre": [
-    { nome: "Faixa 1 (Até R$78,99)", min: 0, max: 78.99, taxaPercentual: 12, taxaFixa: 6 },
-    { nome: "Faixa 2 (A partir de R$79,00)", min: 79.00, max: Infinity, taxaPercentual: 12, taxaFixa: 0 }
-  ],
-  // Amazon, categoria "Casa e Cozinha" (utilidades domésticas): a taxa de
-  // referência é de 15% e cai para 8% nos itens de baixo valor (preço final
-  // até R$29,99). A taxa fixa fica zerada porque no Plano Profissional a
-  // Amazon não cobra tarifa por item vendido — no Plano Individual são R$2,00
-  // por item, que você lança no campo "Taxa fixa da loja" (veja LOJAS_NOTAS).
-  "amazon": [
-    { nome: "Faixa 1 (Até R$29,99)", min: 0, max: 29.99, taxaPercentual: 8, taxaFixa: 0 },
-    { nome: "Faixa 2 (A partir de R$30,00)", min: 30.00, max: Infinity, taxaPercentual: 15, taxaFixa: 0 }
+    { nome: "Clássico (Até R$78,99)", min: 0, max: 78.99, taxaPercentual: 12, taxaFixa: 6, modalidade: "classico" },
+    { nome: "Clássico (A partir de R$79,00)", min: 79.00, max: Infinity, taxaPercentual: 12, taxaFixa: 0, modalidade: "classico" },
+    { nome: "Premium (Até R$78,99)", min: 0, max: 78.99, taxaPercentual: 16.5, taxaFixa: 6, modalidade: "premium" },
+    { nome: "Premium (A partir de R$79,00)", min: 79.00, max: Infinity, taxaPercentual: 16.5, taxaFixa: 0, modalidade: "premium" }
   ]
 };
 
-// Algumas lojas cobram um piso de comissão por venda: se o percentual da
-// categoria render menos que esse valor, é o piso que é cobrado. Hoje só a
-// Amazon tem essa regra, e ela pesa justamente nos itens mais baratos.
-const LOJAS_COMISSAO_MINIMA = {
-  "amazon": 1
-};
-
-// Custos que não cabem na conta de "taxa % + taxa fixa" mas que mudam o
-// resultado no fim do mês — aparecem como lembrete embaixo das faixas. Versão
-// curta do texto salvo em observações, para não tomar a tela da calculadora.
-const LOJAS_NOTAS = {
-  "amazon": 'No Plano Individual, some R$2,00 por item na taxa fixa. A mensalidade do Plano Profissional (R$19,00) e o frete (DBA/FBA, cobrado por peso e dimensão) entram no custo operacional.'
-};
-
-function obterComissaoMinima(lojaNome) {
-  return LOJAS_COMISSAO_MINIMA[(lojaNome || "").trim().toLowerCase()] || 0;
+function getAmazonPlanoSalvo() {
+  const local = localStorage.getItem(`sa_amazon_plano_${currentEmpresaId}`);
+  if (local) return local;
+  const lojaAmazon = lojasCache.find(l => l.nome.trim().toLowerCase() === "amazon");
+  if (lojaAmazon && Number(lojaAmazon.taxa_fixa) >= 2) {
+    return "individual";
+  }
+  return "profissional"; // padrão: Profissional (R$ 0 taxa fixa / item)
 }
 
-function obterFaixaConsistente(lojaNome, custoTotal) {
-  const faixas = LOJAS_FAIXAS[lojaNome.trim().toLowerCase()];
-  if (!faixas) return null;
+function getAmazonFaixas(plano) {
+  const fix = (plano || getAmazonPlanoSalvo()) === "individual" ? 2 : 0;
+  return [
+    { nome: "Casa & Cozinha (12%)", min: 0, max: Infinity, taxaPercentual: 12, taxaFixa: fix },
+    { nome: "Faixa 1 (Até R$29,99 - 8%)", min: 0, max: 29.99, taxaPercentual: 8, taxaFixa: fix },
+    { nome: "Geral (15%)", min: 0, max: Infinity, taxaPercentual: 15, taxaFixa: fix }
+  ];
+}
 
-  const comissaoMinima = obterComissaoMinima(lojaNome);
+const LOJAS_AVISOS = {
+  "amazon": "No Plano Individual, a taxa fixa de R$2,00/item é somada automaticamente. A mensalidade do Plano Profissional (R$19,00) e o frete (DBA/FBA) entram no custo operacional.",
+  "mercado livre": "Produtos com preço até R$78,99 têm custo fixo de R$6,00/unid. A partir de R$79,00, a taxa fixa é zerada e você oferece frete grátis (com coparticipação/desconto do Mercado Envios).",
+  "shopee": "Valores com Programa de Frete Grátis Extra (14% comissão + 6% frete grátis, teto de R$100 de comissão por item). A taxa fixa varia de R$4,00 a R$26,00 conforme o preço de venda.",
+  "tiktok shop": "Taxa para vendedores com CNPJ. Inclui 6% do programa de frete grátis. Até R$49,99 = 10%+R$4 (ou 16% sem fixa); a partir de R$50,00 = 12%+R$6."
+};
 
-  for (const f of faixas) {
-    // Mesma conta do resultado final (incluindo o piso de comissão), para a
-    // faixa destacada bater com o preço que aparece na tela.
-    const { precoVenda } = calcularPrecoVenda({
-      custoProduto: custoTotal,
-      custoEmbalagem: 0,
-      custoOperacional: 0,
-      lucro: 0,
-      taxaPercentual: f.taxaPercentual,
-      taxaFixa: f.taxaFixa,
-      comissaoMinima
-    });
-    if (precoVenda >= f.min && precoVenda <= f.max) {
+const LOJAS_PADRAO_RECOMENDADAS = [
+  {
+    nome: "Shopee",
+    taxa_percentual: 20,
+    taxa_fixa: 4,
+    observacoes: "Taxa com Programa de Frete Grátis Extra: até R$79,99 = 20%+R$4; R$80–99,99 = 14%+R$16; R$100–199,99 = 14%+R$20; acima de R$200 = 14%+R$26."
+  },
+  {
+    nome: "Mercado Livre",
+    taxa_percentual: 12,
+    taxa_fixa: 6,
+    observacoes: "Utilidades Domésticas: Clássico (12%+R$6 até R$78,99; 12%+R$0 a partir de R$79). Premium (16,5%+R$6 até R$78,99; 16,5%+R$0 a partir de R$79)."
+  },
+  {
+    nome: "Amazon",
+    taxa_percentual: 15,
+    taxa_fixa: 0,
+    observacoes: "Comissão de Casa e Cozinha (utilidades domésticas): 15%, caindo para 8% em itens de até R$ 29,99. Plano Profissional: R$0 fixa."
+  },
+  {
+    nome: "TikTok Shop",
+    taxa_percentual: 12,
+    taxa_fixa: 6,
+    observacoes: "Taxa por faixa de preço (vendedor CNPJ): até R$49,99 = 10%+R$4,00 (ou 16% frete grátis); a partir de R$50,00 = 12%+R$6,00."
+  }
+];
+
+const PRESETS_LOJAS_FORM = {
+  "shopee": {
+    nome: "Shopee",
+    taxa_percentual: 20,
+    taxa_fixa: 4,
+    observacoes: "Taxa com Programa de Frete Grátis Extra: até R$79,99 = 20%+R$4; R$80–99,99 = 14%+R$16; R$100–199,99 = 14%+R$20; acima de R$200 = 14%+R$26."
+  },
+  "ml_classico": {
+    nome: "Mercado Livre",
+    taxa_percentual: 12,
+    taxa_fixa: 6,
+    observacoes: "Anúncio Clássico (12%+R$6 até R$78,99; 12%+R$0 a partir de R$79). Categoria Casa e Utilidades."
+  },
+  "ml_premium": {
+    nome: "Mercado Livre",
+    taxa_percentual: 16.5,
+    taxa_fixa: 6,
+    observacoes: "Anúncio Premium (16,5%+R$6 até R$78,99; 16,5%+R$0 a partir de R$79). Inclui parcelamento sem juros."
+  },
+  "amazon": {
+    nome: "Amazon",
+    taxa_percentual: 15,
+    taxa_fixa: 0,
+    observacoes: "Comissão de Casa e Cozinha (utilidades domésticas): 15%, caindo para 8% em itens de até R$ 29,99. Plano Profissional: R$0 fixa."
+  },
+  "tiktok": {
+    nome: "TikTok Shop",
+    taxa_percentual: 12,
+    taxa_fixa: 6,
+    observacoes: "Taxa por faixa de preço (vendedor CNPJ): até R$49,99 = 10%+R$4,00 (ou 16% frete grátis); a partir de R$50,00 = 12%+R$6,00."
+  }
+};
+
+function obterFaixaConsistente(lojaNome, custoTotal, modalidade = null) {
+  const nameKey = lojaNome ? lojaNome.trim().toLowerCase() : "";
+  let faixas = LOJAS_FAIXAS[nameKey];
+
+  if (nameKey === "amazon") {
+    const plano = getAmazonPlanoSalvo();
+    faixas = getAmazonFaixas(plano);
+  }
+
+  if (!faixas || faixas.length === 0) return null;
+
+  const candidatas = modalidade ? faixas.filter(f => f.modalidade === modalidade) : faixas;
+  const lista = candidatas.length > 0 ? candidatas : faixas;
+
+  for (const f of lista) {
+    const t = f.taxaPercentual / 100;
+    if (t >= 1) continue;
+    const p = (custoTotal + f.taxaFixa) / (1 - t);
+    if (p >= f.min && p <= f.max) {
       return f;
     }
   }
-  return faixas[0]; // Retorna a faixa 1 de preferência
+  return lista[0]; // Retorna a primeira faixa por padrão
 }
 
 function renderFaixas(lojaNome, faixaAtiva) {
   const container = document.getElementById("lojaFaixasContainer");
+  const amazonPlanoWrapper = document.getElementById("amazonPlanoWrapper");
   if (!container) return;
 
-  const faixas = LOJAS_FAIXAS[lojaNome.trim().toLowerCase()];
-  const comissaoMinima = obterComissaoMinima(lojaNome);
-  const nota = LOJAS_NOTAS[lojaNome.trim().toLowerCase()];
-  const notaHtml = nota
-    ? `<div class="text-muted small mt-1 opacity-75"><i class="bi bi-lightbulb me-1"></i>${escapeHtml(nota)}</div>`
-    : "";
+  const key = lojaNome ? lojaNome.trim().toLowerCase() : "";
+  const isAmazon = key === "amazon";
 
-  if (!faixas) {
+  if (amazonPlanoWrapper) {
+    if (isAmazon) {
+      amazonPlanoWrapper.classList.remove("d-none");
+      const planoSalvo = getAmazonPlanoSalvo();
+      const radProf = document.getElementById("amazonPlanoProfissional");
+      const radInd = document.getElementById("amazonPlanoIndividual");
+      if (planoSalvo === "individual" && radInd) {
+        radInd.checked = true;
+      } else if (radProf) {
+        radProf.checked = true;
+      }
+    } else {
+      amazonPlanoWrapper.classList.add("d-none");
+    }
+  }
+
+  let faixas = LOJAS_FAIXAS[key];
+  if (isAmazon) {
+    const plano = getAmazonPlanoSalvo();
+    faixas = getAmazonFaixas(plano);
+  }
+
+  const aviso = LOJAS_AVISOS[key];
+
+  if (!faixas || faixas.length === 0) {
     container.innerHTML = `
-      <div class="d-flex flex-column justify-content-center h-100 text-muted small py-2" style="min-height: 95px;">
-        <span class="opacity-75"><i class="bi bi-info-circle me-1"></i> Esta loja não possui faixas de comissão baseadas em preço. As taxas configuradas são fixas.</span>
-        ${notaHtml}
+      <div class="d-flex flex-column justify-content-center h-100 text-muted small py-2" style="min-height: 45px;">
+        <span class="opacity-75"><i class="bi bi-info-circle me-1"></i> Esta loja não possui faixas predefinidas. Você pode ajustar a comissão e taxa fixa manualmente.</span>
       </div>
     `;
     return;
   }
   
   const faixasHtml = faixas.map((f, idx) => {
-    const isActive = faixaAtiva && faixaAtiva.nome === f.nome;
-    // Lojas sem taxa fixa (Amazon, por exemplo) mostram só o percentual, e o
-    // piso de comissão entra como complemento em vez de virar "+ R$ 0,00".
-    let resumoTaxa = `${f.taxaPercentual}%`;
-    if (f.taxaFixa > 0) resumoTaxa += ` + ${formatCurrency(f.taxaFixa)}`;
-    if (comissaoMinima > 0) resumoTaxa += ` (mín. ${formatCurrency(comissaoMinima)})`;
+    const isActive = faixaAtiva && (faixaAtiva.nome === f.nome || (Math.abs(f.taxaPercentual - faixaAtiva.taxaPercentual) < 0.01 && Math.abs(f.taxaFixa - faixaAtiva.taxaFixa) < 0.01));
+    const subLabel = f.taxaFixa > 0 
+      ? `${f.taxaPercentual}% + ${formatCurrency(f.taxaFixa)}` 
+      : `${f.taxaPercentual}% (mín. R$ 1,00)`;
     return `
       <button type="button" 
               class="btn btn-sm faixas-item-btn py-1 px-2 text-start d-flex flex-column ${isActive ? 'active' : ''}" 
               style="font-size: 0.75rem; min-width: 120px;" 
               data-faixa-idx="${idx}">
         <span class="fw-semibold text-nowrap">${escapeHtml(f.nome)}</span>
-        <span class="small opacity-75">${resumoTaxa}</span>
+        <span class="small opacity-75">${subLabel}</span>
       </button>
     `;
   }).join("");
+
+  const avisoHtml = aviso ? `
+    <div class="small text-muted mt-2 d-flex align-items-start gap-1" style="font-size: 0.73rem; line-height: 1.35;">
+      <i class="bi bi-lightbulb text-warning flex-shrink-0" style="font-size: 0.85rem; margin-top: 1px;"></i>
+      <span>${escapeHtml(aviso)}</span>
+    </div>
+  ` : "";
 
   container.innerHTML = `
     <div class="d-flex flex-column gap-1">
@@ -483,7 +600,7 @@ function renderFaixas(lojaNome, faixaAtiva) {
       <div class="d-flex flex-wrap gap-2 mt-1">
         ${faixasHtml}
       </div>
-      ${notaHtml}
+      ${avisoHtml}
     </div>
   `;
 
@@ -507,17 +624,38 @@ function renderFaixas(lojaNome, faixaAtiva) {
 function aplicarTaxaDaLojaSelecionada() {
   const loja = lojasCache.find(l => l.id === selectedLojaId);
   const lojaNome = loja ? loja.nome : "Manual";
+  const nameKey = lojaNome ? lojaNome.trim().toLowerCase() : "";
 
-  // Se a loja tem faixas de preço, marca o checkbox de ajuste automático por padrão
-  const faixas = LOJAS_FAIXAS[lojaNome.trim().toLowerCase()];
+  // Se a loja tem faixas ou presets (incluindo Amazon), ativa o ajuste automático por padrão
+  const faixas = nameKey === "amazon" ? getAmazonFaixas() : LOJAS_FAIXAS[nameKey];
   const autoCheckbox = document.getElementById("calcAutoAjustarTaxa");
   if (autoCheckbox) {
     autoCheckbox.checked = !!faixas;
   }
 
   if (loja) {
-    document.getElementById("calcTaxaPercentual").value = loja.taxa_percentual;
-    document.getElementById("calcTaxaFixa").value = loja.taxa_fixa;
+    if (faixas && faixas.length > 0) {
+      const custoProduto = Number(document.getElementById("calcCustoProduto")?.value) || 0;
+      const custoEmbalagem = Number(document.getElementById("calcCustoEmbalagem")?.value) || 0;
+      const custoOperacional = Number(document.getElementById("calcCustoOperacional")?.value) || 0;
+      const lucroInput = Number(document.getElementById("calcLucro")?.value) || 0;
+      const lucroTipo = document.getElementById("calcLucroTipo")?.value || "percentual";
+      const custoBase = custoProduto + custoEmbalagem + custoOperacional;
+      const lucro = lucroTipo === "percentual" ? custoBase * (lucroInput / 100) : lucroInput;
+      const custoTotal = custoBase + lucro;
+
+      const faixa = obterFaixaConsistente(lojaNome, custoTotal);
+      if (faixa) {
+        document.getElementById("calcTaxaPercentual").value = faixa.taxaPercentual;
+        document.getElementById("calcTaxaFixa").value = faixa.taxaFixa;
+      } else {
+        document.getElementById("calcTaxaPercentual").value = loja.taxa_percentual;
+        document.getElementById("calcTaxaFixa").value = loja.taxa_fixa;
+      }
+    } else {
+      document.getElementById("calcTaxaPercentual").value = loja.taxa_percentual;
+      document.getElementById("calcTaxaFixa").value = loja.taxa_fixa;
+    }
   } else {
     document.getElementById("calcTaxaPercentual").value = 0;
     document.getElementById("calcTaxaFixa").value = 0;
@@ -547,14 +685,27 @@ function renderLojasTable() {
     const desatualizada = dias !== null && dias > DIAS_PARA_REVISAR;
     const atualizadoTexto = formatTimestamp(atualizadoEm);
 
-    // data-label alimenta o rótulo de cada campo quando a tabela vira "cards"
-    // empilhados no mobile (.table-stack-mobile, ver css/style.css) — no
-    // desktop esses atributos não fazem nada, a tabela renderiza normal.
+    const nameLower = l.nome.toLowerCase().trim();
+    let badgeClass = "badge px-2 py-1 me-1";
+    if (nameLower.includes("shopee")) {
+      badgeClass += " badge-store-shopee";
+    } else if (nameLower.includes("tiktok")) {
+      badgeClass += " badge-store-tiktok";
+    } else if (nameLower.includes("amazon")) {
+      badgeClass += " badge-store-amazon";
+    } else if (nameLower.includes("mercado livre") || nameLower.includes("mercado_livre")) {
+      badgeClass += " badge-store-mercadolivre";
+    } else {
+      badgeClass += " badge-store-generic";
+    }
+
     tr.innerHTML = `
-      <td data-label="Nome">${escapeHtml(l.nome)}</td>
-      <td data-label="Taxa %">${Number(l.taxa_percentual).toFixed(2)}%</td>
+      <td data-label="Nome">
+        <span class="${badgeClass}" style="font-size: 0.75rem;">${escapeHtml(l.nome)}</span>
+      </td>
+      <td data-label="Taxa %" class="fw-semibold">${Number(l.taxa_percentual).toFixed(2)}%</td>
       <td data-label="Taxa fixa (R$)">${formatCurrency(l.taxa_fixa)}</td>
-      <td class="small text-muted td-stack-full" data-label="Observações">${escapeHtml(l.observacoes || "—")}</td>
+      <td class="small text-muted td-stack-full" data-label="Observações" style="max-width: 280px; font-size: 0.75rem;">${escapeHtml(l.observacoes || "—")}</td>
       <td class="small ${desatualizada ? "text-danger" : "text-muted"}" data-label="Atualizado em">
         ${atualizadoTexto}
         ${desatualizada ? '<br><i class="bi bi-exclamation-triangle-fill"></i> revisar taxa' : ""}
@@ -598,6 +749,54 @@ function cancelarEdicaoLoja() {
 }
 
 document.getElementById("lojaCancelEditBtn")?.addEventListener("click", cancelarEdicaoLoja);
+
+// Modelos rápidos de preenchimento de lojas
+document.querySelectorAll("[data-loja-preset]").forEach(btn => {
+  btn.addEventListener("click", (e) => {
+    const presetKey = e.currentTarget.dataset.lojaPreset;
+    const preset = PRESETS_LOJAS_FORM[presetKey];
+    if (!preset) return;
+
+    document.getElementById("lojaNome").value = preset.nome;
+    document.getElementById("lojaTaxaPercentual").value = preset.taxa_percentual;
+    document.getElementById("lojaTaxaFixa").value = preset.taxa_fixa;
+    document.getElementById("lojaObservacoes").value = preset.observacoes;
+    document.getElementById("lojaNome").focus();
+  });
+});
+
+// Botão para restaurar/sincronizar lojas padrão de 2026
+document.getElementById("btnRestaurarLojasPadrao")?.addEventListener("click", async (e) => {
+  const ok = await confirmDialog("Deseja atualizar todas as lojas padrão (Shopee, Mercado Livre, Amazon e TikTok Shop) para as taxas oficiais de referência de 2026 para Utilidades Domésticas?", {
+    confirmText: "Restaurar taxas",
+    title: "Atualizar taxas de referência"
+  });
+  if (!ok) return;
+
+  const btn = e.currentTarget;
+  await withLoadingButton(btn, "Atualizando...", async () => {
+    for (const padrao of LOJAS_PADRAO_RECOMENDADAS) {
+      const existente = lojasCache.find(l => l.nome.trim().toLowerCase() === padrao.nome.toLowerCase());
+      if (existente) {
+        await supabaseClient.from("lojas_ecommerce").update({
+          taxa_percentual: padrao.taxa_percentual,
+          taxa_fixa: padrao.taxa_fixa,
+          observacoes: padrao.observacoes
+        }).eq("id", existente.id);
+      } else {
+        await supabaseClient.from("lojas_ecommerce").insert({
+          empresa_id: currentEmpresaId,
+          ...padrao
+        });
+      }
+    }
+
+    showToast("Taxas padrão de 2026 atualizadas com sucesso!");
+    await loadLojas();
+    aplicarTaxaDaLojaSelecionada();
+    atualizarResultado();
+  });
+});
 
 const novaLojaForm = document.getElementById("novaLojaForm");
 if (novaLojaForm) {
@@ -882,17 +1081,19 @@ function atualizarResultado(faixaForcada) {
     let fix = 0;
     
     if (id) {
-      if (autoCheckbox && autoCheckbox.checked) {
-        const faixa = obterFaixaConsistente(name, custoTotal);
-        pct = faixa ? faixa.taxaPercentual : l.taxa_percentual;
-        fix = faixa ? faixa.taxaFixa : l.taxa_fixa;
+      if (id === selectedLojaId) {
+        // Para a loja ativa no formulário principal, respeita o valor exibido na tela
+        pct = taxaPercentual;
+        fix = taxaFixa;
       } else {
-        if (id === selectedLojaId) {
-          pct = taxaPercentual;
-          fix = taxaFixa;
+        // Para as demais lojas comparadas, usa as faixas inteligentes da própria loja
+        const faixa = obterFaixaConsistente(name, custoTotal);
+        if (faixa) {
+          pct = faixa.taxaPercentual;
+          fix = faixa.taxaFixa;
         } else {
-          pct = l.taxa_percentual;
-          fix = l.taxa_fixa;
+          pct = Number(l.taxa_percentual) || 0;
+          fix = Number(l.taxa_fixa) || 0;
         }
       }
     } else {
@@ -939,17 +1140,23 @@ function atualizarResultado(faixaForcada) {
   ultimoCalculosArray = selectedLojasIds.map(id => {
     const res = obterCalculoParaLoja(id);
     const l = id ? lojasCache.find(x => x.id === id) : null;
+    const name = l ? l.nome : "Manual";
     
     let pct = 0;
     let fix = 0;
     if (id) {
-      if (autoCheckbox && autoCheckbox.checked) {
-        const faixa = obterFaixaConsistente(l.nome, custoTotal);
-        pct = faixa ? faixa.taxaPercentual : l.taxa_percentual;
-        fix = faixa ? faixa.taxaFixa : l.taxa_fixa;
+      if (id === selectedLojaId) {
+        pct = taxaPercentual;
+        fix = taxaFixa;
       } else {
-        pct = id === selectedLojaId ? taxaPercentual : l.taxa_percentual;
-        fix = id === selectedLojaId ? taxaFixa : l.taxa_fixa;
+        const faixa = obterFaixaConsistente(name, custoTotal);
+        if (faixa) {
+          pct = faixa.taxaPercentual;
+          fix = faixa.taxaFixa;
+        } else {
+          pct = Number(l.taxa_percentual) || 0;
+          fix = Number(l.taxa_fixa) || 0;
+        }
       }
     } else {
       pct = taxaPercentual;

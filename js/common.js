@@ -252,3 +252,25 @@ function formatTimestamp(ts, { comHora = false } = {}) {
   if (!comHora) return data;
   return `${data} ${d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
 }
+
+// Gera uma badge com cor consistente e distintiva para cada sócio
+function renderSocioBadge(socioOrNome) {
+  if (!socioOrNome) {
+    return `<span class="sa-socio-badge sa-socio-color-neutral"><span class="sa-socio-dot"></span><span>—</span></span>`;
+  }
+
+  const nome = typeof socioOrNome === "string" ? socioOrNome.trim() : (socioOrNome.nome || "").trim();
+  if (!nome || nome === "—" || nome === "-") {
+    return `<span class="sa-socio-badge sa-socio-color-neutral"><span class="sa-socio-dot"></span><span>—</span></span>`;
+  }
+
+  // Gera um hash determinístico do nome para escolher a cor (0 a 7)
+  let hash = 0;
+  for (let i = 0; i < nome.length; i++) {
+    hash = (hash << 5) - hash + nome.charCodeAt(i);
+    hash |= 0;
+  }
+  const colorIndex = Math.abs(hash) % 8;
+
+  return `<span class="sa-socio-badge sa-socio-color-${colorIndex}"><span class="sa-socio-dot"></span><span>${escapeHtml(nome)}</span></span>`;
+}
