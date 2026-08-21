@@ -506,7 +506,7 @@ begin
     (p_empresa_id, 'Mercado Livre', 12, 6,
      'Anúncio Clássico: 10–14%. Premium: 15–19%. Produtos até R$79 pagam também custo fixo por unidade (~R$5,50–R$6,00+). Confira a taxa exata da categoria do seu produto no Seller Center.'),
     (p_empresa_id, 'Amazon', 15, 0,
-     'Taxa de referência entre 8% e 15% conforme a categoria (pode chegar a 20% em algumas categorias específicas). Confira a categoria exata no Seller Central.')
+     'Comissão de Casa e Cozinha (utilidades domésticas): 15%, caindo para 8% em itens de até R$29,99, com mínimo de R$1,00 por venda. Plano Profissional: R$19,00/mês e nenhuma tarifa por item — rateie a mensalidade no custo operacional. Plano Individual: R$2,00 por item vendido — nesse caso preencha a taxa fixa com 2,00. O frete (DBA/FBA) é cobrado à parte, por peso e dimensão.')
   on conflict (empresa_id, lower(nome)) do nothing;
 end;
 $$;
