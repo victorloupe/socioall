@@ -12,6 +12,7 @@ let historicoItensPorPagina = 10;
 let historicoGruposOrdenados = [];
 let historicoBuscaTermo = "";
 let filtroApenasKits = false;
+let amazonAtualizacaoTentada = false;
 
 async function initPrecificacao() {
   const ctx = await initAuthenticatedPage('precificacao');
@@ -181,7 +182,10 @@ function obterPrecoSugeridoSemPromo() {
 
   if (taxaPercentual >= 100) return 0;
 
-  const res = calcularPrecoVenda({ custoProduto, custoEmbalagem, custoOperacional, lucro, taxaPercentual, taxaFixa });
+  const lojaAtual = lojasCache.find(l => l.id === selectedLojaId);
+  const comissaoMinima = obterComissaoMinima(lojaAtual ? lojaAtual.nome : "");
+
+  const res = calcularPrecoVenda({ custoProduto, custoEmbalagem, custoOperacional, lucro, taxaPercentual, taxaFixa, comissaoMinima });
   return res.precoVenda;
 }
 
@@ -224,6 +228,23 @@ async function loadLojas() {
       observacoes: 'Taxa por faixa de preço: até R$49,99 = 16% (sem taxa fixa); a partir de R$50,00 = 12%+R$6,00. Valores já incluem 6% do programa de frete grátis. Ajuste conforme a sua conta.'
     });
     if (!insertError) {
+      return loadLojas();
+    }
+  }
+
+  // A Amazon foi cadastrada no início com uma taxa genérica ("entre 8% e 15%"),
+  // sem faixas e sem as regras de utilidades domésticas. Se a loja ainda está
+  // com esse texto padrão, atualiza para a comissão real da categoria — quem já
+  // ajustou a observação por conta própria não é mexido. A flag evita ficar
+  // recarregando em loop caso o update não passe (permissão, por exemplo).
+  const amazon = data && data.find(l => l.nome.trim().toLowerCase() === "amazon");
+  if (!amazonAtualizacaoTentada && amazon && (amazon.observacoes || "").startsWith("Taxa de referência entre 8% e 15%")) {
+    amazonAtualizacaoTentada = true;
+    const { error: amazonError } = await supabaseClient
+      .from("lojas_ecommerce")
+      .update({ taxa_percentual: 15, taxa_fixa: 0, observacoes: AMAZON_OBSERVACOES })
+      .eq("id", amazon.id);
+    if (!amazonError) {
       return loadLojas();
     }
   }
@@ -346,6 +367,8 @@ function renderLojaTabs() {
   aplicarTaxaDaLojaSelecionada();
 }
 
+const AMAZON_OBSERVACOES = 'Comissão de Casa e Cozinha (utilidades domésticas): 15%, caindo para 8% em itens de até R$29,99, com mínimo de R$1,00 por venda. Plano Profissional: R$19,00/mês e nenhuma tarifa por item — rateie a mensalidade no custo operacional. Plano Individual: R$2,00 por item vendido — nesse caso preencha a taxa fixa com 2,00. O frete (DBA/FBA) é cobrado à parte, por peso e dimensão.';
+
 const LOJAS_FAIXAS = {
   "shopee": [
     { nome: "Faixa 1 (Até R$79,99)", min: 0, max: 79.99, taxaPercentual: 20, taxaFixa: 4 },
@@ -360,17 +383,55 @@ const LOJAS_FAIXAS = {
   "mercado livre": [
     { nome: "Faixa 1 (Até R$78,99)", min: 0, max: 78.99, taxaPercentual: 12, taxaFixa: 6 },
     { nome: "Faixa 2 (A partir de R$79,00)", min: 79.00, max: Infinity, taxaPercentual: 12, taxaFixa: 0 }
+  ],
+  // Amazon, categoria "Casa e Cozinha" (utilidades domésticas): a taxa de
+  // referência é de 15% e cai para 8% nos itens de baixo valor (preço final
+  // até R$29,99). A taxa fixa fica zerada porque no Plano Profissional a
+  // Amazon não cobra tarifa por item vendido — no Plano Individual são R$2,00
+  // por item, que você lança no campo "Taxa fixa da loja" (veja LOJAS_NOTAS).
+  "amazon": [
+    { nome: "Faixa 1 (Até R$29,99)", min: 0, max: 29.99, taxaPercentual: 8, taxaFixa: 0 },
+    { nome: "Faixa 2 (A partir de R$30,00)", min: 30.00, max: Infinity, taxaPercentual: 15, taxaFixa: 0 }
   ]
 };
+
+// Algumas lojas cobram um piso de comissão por venda: se o percentual da
+// categoria render menos que esse valor, é o piso que é cobrado. Hoje só a
+// Amazon tem essa regra, e ela pesa justamente nos itens mais baratos.
+const LOJAS_COMISSAO_MINIMA = {
+  "amazon": 1
+};
+
+// Custos que não cabem na conta de "taxa % + taxa fixa" mas que mudam o
+// resultado no fim do mês — aparecem como lembrete embaixo das faixas. Versão
+// curta do texto salvo em observações, para não tomar a tela da calculadora.
+const LOJAS_NOTAS = {
+  "amazon": 'No Plano Individual, some R$2,00 por item na taxa fixa. A mensalidade do Plano Profissional (R$19,00) e o frete (DBA/FBA, cobrado por peso e dimensão) entram no custo operacional.'
+};
+
+function obterComissaoMinima(lojaNome) {
+  return LOJAS_COMISSAO_MINIMA[(lojaNome || "").trim().toLowerCase()] || 0;
+}
 
 function obterFaixaConsistente(lojaNome, custoTotal) {
   const faixas = LOJAS_FAIXAS[lojaNome.trim().toLowerCase()];
   if (!faixas) return null;
 
+  const comissaoMinima = obterComissaoMinima(lojaNome);
+
   for (const f of faixas) {
-    const t = f.taxaPercentual / 100;
-    const p = (custoTotal + f.taxaFixa) / (1 - t);
-    if (p >= f.min && p <= f.max) {
+    // Mesma conta do resultado final (incluindo o piso de comissão), para a
+    // faixa destacada bater com o preço que aparece na tela.
+    const { precoVenda } = calcularPrecoVenda({
+      custoProduto: custoTotal,
+      custoEmbalagem: 0,
+      custoOperacional: 0,
+      lucro: 0,
+      taxaPercentual: f.taxaPercentual,
+      taxaFixa: f.taxaFixa,
+      comissaoMinima
+    });
+    if (precoVenda >= f.min && precoVenda <= f.max) {
       return f;
     }
   }
@@ -382,10 +443,17 @@ function renderFaixas(lojaNome, faixaAtiva) {
   if (!container) return;
 
   const faixas = LOJAS_FAIXAS[lojaNome.trim().toLowerCase()];
+  const comissaoMinima = obterComissaoMinima(lojaNome);
+  const nota = LOJAS_NOTAS[lojaNome.trim().toLowerCase()];
+  const notaHtml = nota
+    ? `<div class="text-muted small mt-1 opacity-75"><i class="bi bi-lightbulb me-1"></i>${escapeHtml(nota)}</div>`
+    : "";
+
   if (!faixas) {
     container.innerHTML = `
       <div class="d-flex flex-column justify-content-center h-100 text-muted small py-2" style="min-height: 95px;">
         <span class="opacity-75"><i class="bi bi-info-circle me-1"></i> Esta loja não possui faixas de comissão baseadas em preço. As taxas configuradas são fixas.</span>
+        ${notaHtml}
       </div>
     `;
     return;
@@ -393,13 +461,18 @@ function renderFaixas(lojaNome, faixaAtiva) {
   
   const faixasHtml = faixas.map((f, idx) => {
     const isActive = faixaAtiva && faixaAtiva.nome === f.nome;
+    // Lojas sem taxa fixa (Amazon, por exemplo) mostram só o percentual, e o
+    // piso de comissão entra como complemento em vez de virar "+ R$ 0,00".
+    let resumoTaxa = `${f.taxaPercentual}%`;
+    if (f.taxaFixa > 0) resumoTaxa += ` + ${formatCurrency(f.taxaFixa)}`;
+    if (comissaoMinima > 0) resumoTaxa += ` (mín. ${formatCurrency(comissaoMinima)})`;
     return `
       <button type="button" 
               class="btn btn-sm faixas-item-btn py-1 px-2 text-start d-flex flex-column ${isActive ? 'active' : ''}" 
               style="font-size: 0.75rem; min-width: 120px;" 
               data-faixa-idx="${idx}">
         <span class="fw-semibold text-nowrap">${escapeHtml(f.nome)}</span>
-        <span class="small opacity-75">${f.taxaPercentual}% + ${formatCurrency(f.taxaFixa)}</span>
+        <span class="small opacity-75">${resumoTaxa}</span>
       </button>
     `;
   }).join("");
@@ -410,6 +483,7 @@ function renderFaixas(lojaNome, faixaAtiva) {
       <div class="d-flex flex-wrap gap-2 mt-1">
         ${faixasHtml}
       </div>
+      ${notaHtml}
     </div>
   `;
 
@@ -583,13 +657,24 @@ async function excluirLoja(id) {
 // lucro) depois de descontada a taxa, o preço de venda tem que ser:
 //   precoVenda = (custoTotal + F) / (1 - t/100)
 // Conferência: precoVenda - F - precoVenda*(t/100) deve bater com custoTotal.
-function calcularPrecoVenda({ custoProduto, custoEmbalagem, custoOperacional, lucro, taxaPercentual, taxaFixa }) {
+// Quando a loja cobra uma comissão mínima por venda (M) e o percentual não
+// alcança esse piso — o caso da Amazon em produtos baratos —, quem manda é o
+// piso: a comissão vira um valor fixo e o preço passa a ser custoTotal + F + M.
+function calcularPrecoVenda({ custoProduto, custoEmbalagem, custoOperacional, lucro, taxaPercentual, taxaFixa, comissaoMinima = 0 }) {
   const custoTotal = custoProduto + custoEmbalagem + custoOperacional + lucro;
   const t = taxaPercentual / 100;
-  const precoVenda = (custoTotal + taxaFixa) / (1 - t);
-  const valorTaxaPercentual = precoVenda * t;
+  let precoVenda = (custoTotal + taxaFixa) / (1 - t);
+  let valorTaxaPercentual = precoVenda * t;
+  let comissaoMinimaAplicada = false;
+
+  if (comissaoMinima > 0 && valorTaxaPercentual < comissaoMinima) {
+    comissaoMinimaAplicada = true;
+    valorTaxaPercentual = comissaoMinima;
+    precoVenda = custoTotal + taxaFixa + comissaoMinima;
+  }
+
   const liquido = precoVenda - taxaFixa - valorTaxaPercentual;
-  return { custoTotal, precoVenda, valorTaxaPercentual, liquido };
+  return { custoTotal, precoVenda, valorTaxaPercentual, liquido, comissaoMinimaAplicada };
 }
 
 // Lê os campos e recalcula o resultado — chamada tanto ao enviar o formulário
@@ -639,13 +724,14 @@ function atualizarResultado(faixaForcada) {
 
   const taxaPercentual = Number(document.getElementById("calcTaxaPercentual").value) || 0;
   const taxaFixa = Number(document.getElementById("calcTaxaFixa").value) || 0;
+  const comissaoMinima = obterComissaoMinima(lojaNome);
 
   if (taxaPercentual >= 100) {
     showToast("A taxa percentual da loja precisa ser menor que 100%.", "error");
     return;
   }
 
-  const resultado = calcularPrecoVenda({ custoProduto, custoEmbalagem, custoOperacional, lucro, taxaPercentual, taxaFixa });
+  const resultado = calcularPrecoVenda({ custoProduto, custoEmbalagem, custoOperacional, lucro, taxaPercentual, taxaFixa, comissaoMinima });
 
   const simularPromo = document.getElementById("calcSimularPromo")?.checked || false;
   const precoPromocional = Number(document.getElementById("calcPromoPreco")?.value) || 0;
@@ -655,7 +741,8 @@ function atualizarResultado(faixaForcada) {
   let liquidoFinal = resultado.liquido;
 
   if (simularPromo && precoPromocional > 0) {
-    const valorTaxaPercentual = precoPromocional * (taxaPercentual / 100);
+    const valorTaxaPercentual = Math.max(precoPromocional * (taxaPercentual / 100), comissaoMinima);
+    resultadoFinal.comissaoMinimaAplicada = comissaoMinima > 0 && precoPromocional * (taxaPercentual / 100) < comissaoMinima;
     const liquidoPromo = precoPromocional - valorTaxaPercentual - taxaFixa - custoEmbalagem - custoOperacional;
     const lucroPromo = liquidoPromo - custoProduto;
     
@@ -700,7 +787,16 @@ function atualizarResultado(faixaForcada) {
   }
 
   document.getElementById("resTaxaFixa").textContent = formatCurrency(taxaFixa);
-  document.getElementById("resTaxaPercentual").textContent = `${taxaPercentual.toFixed(2)}% (${formatCurrency(resultadoFinal.valorTaxaPercentual)})`;
+
+  // Quando o piso de comissão entra em ação, mostrar "8% (R$ 1,00)" seria
+  // mentira: o que foi cobrado é o mínimo, não o percentual da categoria.
+  const resTaxaPercentualEl = document.getElementById("resTaxaPercentual");
+  if (resultadoFinal.comissaoMinimaAplicada) {
+    const nominal = resultadoFinal.precoVenda * (taxaPercentual / 100);
+    resTaxaPercentualEl.textContent = `mínimo de ${formatCurrency(resultadoFinal.valorTaxaPercentual)} (${taxaPercentual.toFixed(2)}% daria ${formatCurrency(nominal)})`;
+  } else {
+    resTaxaPercentualEl.textContent = `${taxaPercentual.toFixed(2)}% (${formatCurrency(resultadoFinal.valorTaxaPercentual)})`;
+  }
 
   const resLiquidoEl = document.getElementById("resLiquido");
   if (simularPromo && precoPromocional > 0) {
@@ -804,7 +900,12 @@ function atualizarResultado(faixaForcada) {
       fix = taxaFixa;
     }
     
-    return calcularPrecoVenda({ custoProduto, custoEmbalagem, custoOperacional, lucro, taxaPercentual: pct, taxaFixa: fix });
+    return calcularPrecoVenda({
+      custoProduto, custoEmbalagem, custoOperacional, lucro,
+      taxaPercentual: pct,
+      taxaFixa: fix,
+      comissaoMinima: obterComissaoMinima(name)
+    });
   };
 
   const multiWrapper = document.getElementById("resultadoMultiploWrapper");
@@ -853,6 +954,13 @@ function atualizarResultado(faixaForcada) {
     } else {
       pct = taxaPercentual;
       fix = taxaFixa;
+    }
+
+    // Se o piso de comissão da loja entrou em ação, o percentual da categoria
+    // não foi o que saiu do bolso — guardamos a taxa efetiva para o histórico
+    // refazer a conta e chegar no mesmo líquido.
+    if (res.comissaoMinimaAplicada && res.precoVenda > 0) {
+      pct = (res.valorTaxaPercentual / res.precoVenda) * 100;
     }
 
     let pPromocional = null;
