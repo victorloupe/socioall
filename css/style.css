@@ -2034,4 +2034,153 @@ html.dark-theme .sa-socio-color-6 { background-color: rgba(6, 182, 212, 0.15); c
 html.dark-theme .sa-socio-color-7 { background-color: rgba(217, 70, 239, 0.15); color: #F0ABFC; border-color: rgba(217, 70, 239, 0.3); }
 html.dark-theme .sa-socio-color-neutral { background-color: rgba(148, 163, 184, 0.12); color: #CBD5E1; border-color: rgba(148, 163, 184, 0.2); }
 
+/* ---------- Melhorias da Calculadora de Preços ---------- */
+
+/* Barra Visual de Distribuição de Custos (Breakdown) */
+.sa-breakdown-container {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background-color: var(--sa-bg);
+  border: 1px solid var(--sa-border);
+  border-radius: var(--sa-radius-sm);
+}
+
+.sa-breakdown-bar {
+  display: flex;
+  height: 12px;
+  border-radius: 999px;
+  overflow: hidden;
+  background-color: #E2E8F0;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.06);
+}
+
+.sa-breakdown-segment {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.sa-breakdown-segment.segment-custo {
+  background: linear-gradient(135deg, #64748B, #475569);
+}
+
+.sa-breakdown-segment.segment-taxas {
+  background: linear-gradient(135deg, #F59E0B, #D97706);
+}
+
+.sa-breakdown-segment.segment-lucro {
+  background: linear-gradient(135deg, #10B981, #059669);
+}
+
+.sa-breakdown-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 0.72rem;
+}
+
+.sa-breakdown-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sa-breakdown-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Botões de Arredondamento Psicológico */
+.sa-round-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.sa-round-btn {
+  font-size: 0.68rem;
+  padding: 2px 7px;
+  border-radius: 12px;
+  border: 1px solid var(--sa-border);
+  background-color: #FFFFFF;
+  color: var(--sa-text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.sa-round-btn:hover {
+  background-color: rgba(14, 165, 233, 0.08);
+  color: var(--sa-teal-dark);
+  border-color: var(--sa-teal);
+}
+
+/* Card de Métricas de Ads (Breakeven) */
+.sa-ads-metrics-card {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background-color: rgba(240, 249, 255, 0.7);
+  border: 1px solid #BAE6FD;
+  border-radius: var(--sa-radius-sm);
+}
+
+.sa-ads-metric-val {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #0369A1;
+}
+
+.sa-ads-metric-label {
+  font-size: 0.68rem;
+  color: #64748B;
+}
+
+/* Alerta de Frete Grátis Mercado Livre */
+.sa-ml-frete-card {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background-color: rgba(254, 243, 199, 0.6);
+  border: 1px solid #FDE68A;
+  border-radius: var(--sa-radius-sm);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+/* Grupo de Modo de Cálculo */
+.sa-calc-mode-group {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.sa-calc-mode-group .btn {
+  white-space: nowrap;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (max-width: 576px) {
+  .sa-calc-header-row {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 8px;
+  }
+  .sa-calc-mode-group {
+    width: 100%;
+    display: flex;
+  }
+  .sa-calc-mode-group .btn {
+    flex: 1;
+    padding: 4px 8px;
+    font-size: 0.75rem;
+  }
+}
+
+
 

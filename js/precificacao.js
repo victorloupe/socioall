@@ -163,6 +163,38 @@ async function initPrecificacao() {
     atualizarResultado();
   });
 
+  // Alternador de modo de cálculo: Por Margem (padrão) vs Preço Alvo (Inverso)
+  document.querySelectorAll('input[name="calcModoCalculo"]').forEach(radio => {
+    radio.addEventListener("change", (e) => {
+      const modo = e.target.value;
+      const wrapLucro = document.getElementById("wrapperCalcLucro");
+      const wrapPrecoAlvo = document.getElementById("wrapperCalcPrecoAlvo");
+      const inputPrecoAlvo = document.getElementById("calcPrecoAlvoInput");
+
+      if (modo === "preco_alvo") {
+        wrapLucro?.classList.add("d-none");
+        wrapPrecoAlvo?.classList.remove("d-none");
+        if (inputPrecoAlvo && !inputPrecoAlvo.value) {
+          const pSugerido = obterPrecoSugeridoSemPromo();
+          if (pSugerido > 0) inputPrecoAlvo.value = pSugerido.toFixed(2);
+        }
+        inputPrecoAlvo?.focus();
+      } else {
+        wrapPrecoAlvo?.classList.add("d-none");
+        wrapLucro?.classList.remove("d-none");
+      }
+      atualizarResultado();
+    });
+  });
+
+  document.getElementById("calcPrecoAlvoInput")?.addEventListener("input", () => {
+    atualizarResultado();
+  });
+
+  document.getElementById("btnExportarCSV")?.addEventListener("click", () => {
+    exportarHistoricoCSV();
+  });
+
   // Listener para persistir o Plano de Venda da Amazon (Profissional vs Individual)
   document.querySelectorAll('input[name="amazonPlanoRadio"]').forEach(radio => {
     radio.addEventListener("change", async (e) => {
@@ -400,6 +432,16 @@ function renderLojaTabs() {
 
 const AMAZON_OBSERVACOES = 'Comissão de Casa e Cozinha (utilidades domésticas): 15%, caindo para 8% em itens de até R$29,99, com mínimo de R$1,00 por venda. Plano Profissional: R$19,00/mês e nenhuma tarifa por item — rateie a mensalidade no custo operacional. Plano Individual: R$2,00 por item vendido — nesse caso preencha a taxa fixa com 2,00. O frete (DBA/FBA) é cobrado à parte, por peso e dimensão.';
 
+// Algumas lojas cobram um piso de comissão por venda: se o percentual da
+// categoria render menos que esse valor, é o piso que é cobrado (ex: Amazon).
+const LOJAS_COMISSAO_MINIMA = {
+  "amazon": 1
+};
+
+function obterComissaoMinima(lojaNome) {
+  return LOJAS_COMISSAO_MINIMA[(lojaNome || "").trim().toLowerCase()] || 0;
+}
+
 const LOJAS_FAIXAS = {
   "shopee": [
     { nome: "Faixa 1 (Até R$79,99)", min: 0, max: 79.99, taxaPercentual: 20, taxaFixa: 4 },
@@ -432,9 +474,9 @@ function getAmazonPlanoSalvo() {
 function getAmazonFaixas(plano) {
   const fix = (plano || getAmazonPlanoSalvo()) === "individual" ? 2 : 0;
   return [
-    { nome: "Casa & Cozinha (12%)", min: 0, max: Infinity, taxaPercentual: 12, taxaFixa: fix },
     { nome: "Faixa 1 (Até R$29,99 - 8%)", min: 0, max: 29.99, taxaPercentual: 8, taxaFixa: fix },
-    { nome: "Geral (15%)", min: 0, max: Infinity, taxaPercentual: 15, taxaFixa: fix }
+    { nome: "Faixa 2 (A partir de R$30,00 - 15%)", min: 30.00, max: Infinity, taxaPercentual: 15, taxaFixa: fix },
+    { nome: "Casa & Cozinha (12%)", min: 0, max: Infinity, taxaPercentual: 12, taxaFixa: fix }
   ];
 }
 
@@ -518,12 +560,21 @@ function obterFaixaConsistente(lojaNome, custoTotal, modalidade = null) {
 
   const candidatas = modalidade ? faixas.filter(f => f.modalidade === modalidade) : faixas;
   const lista = candidatas.length > 0 ? candidatas : faixas;
+  const comissaoMinima = obterComissaoMinima(lojaNome);
 
   for (const f of lista) {
     const t = f.taxaPercentual / 100;
     if (t >= 1) continue;
-    const p = (custoTotal + f.taxaFixa) / (1 - t);
-    if (p >= f.min && p <= f.max) {
+    const { precoVenda } = calcularPrecoVenda({
+      custoProduto: custoTotal,
+      custoEmbalagem: 0,
+      custoOperacional: 0,
+      lucro: 0,
+      taxaPercentual: f.taxaPercentual,
+      taxaFixa: f.taxaFixa,
+      comissaoMinima
+    });
+    if (precoVenda >= f.min && precoVenda <= f.max) {
       return f;
     }
   }
@@ -886,16 +937,18 @@ function atualizarResultado(faixaForcada) {
     if (autoCheckbox) autoCheckbox.checked = false;
   }
 
+  const modoCalculo = document.querySelector('input[name="calcModoCalculo"]:checked')?.value || "margem";
+  const precoAlvoInputVal = Number(document.getElementById("calcPrecoAlvoInput")?.value) || 0;
+
   const custoProduto = Number(document.getElementById("calcCustoProduto").value) || 0;
   const custoEmbalagem = Number(document.getElementById("calcCustoEmbalagem").value) || 0;
   const custoOperacional = Number(document.getElementById("calcCustoOperacional").value) || 0;
   const lucroInput = Number(document.getElementById("calcLucro").value) || 0;
   const lucroTipo = document.getElementById("calcLucroTipo").value;
 
-  // Lucro em % incide sobre o custo do produto + embalagem + operacional.
   const custoBase = custoProduto + custoEmbalagem + custoOperacional;
-  const lucro = lucroTipo === "percentual" ? custoBase * (lucroInput / 100) : lucroInput;
-  const custoTotal = custoBase + lucro;
+  let lucro = lucroTipo === "percentual" ? custoBase * (lucroInput / 100) : lucroInput;
+  let custoTotal = custoBase + lucro;
 
   const loja = lojasCache.find(l => l.id === selectedLojaId);
   const lojaNome = loja ? loja.nome : "Manual";
@@ -905,14 +958,13 @@ function atualizarResultado(faixaForcada) {
   if (faixaForcada) {
     faixaAtiva = faixaForcada;
   } else if (autoCheckbox && autoCheckbox.checked) {
-    faixaAtiva = obterFaixaConsistente(lojaNome, custoTotal);
+    const baseParaFaixa = modoCalculo === "preco_alvo" && precoAlvoInputVal > 0 ? precoAlvoInputVal : custoTotal;
+    faixaAtiva = obterFaixaConsistente(lojaNome, baseParaFaixa);
     if (faixaAtiva) {
       document.getElementById("calcTaxaPercentual").value = faixaAtiva.taxaPercentual;
       document.getElementById("calcTaxaFixa").value = faixaAtiva.taxaFixa;
     }
   } else {
-    // Se não for forçada e o auto ajuste estiver desmarcado, tenta identificar se a taxa atual
-    // equivale a alguma faixa para destacá-la visualmente
     const currentPct = Number(document.getElementById("calcTaxaPercentual").value) || 0;
     const currentFixa = Number(document.getElementById("calcTaxaFixa").value) || 0;
     const faixas = LOJAS_FAIXAS[lojaNome.trim().toLowerCase()];
@@ -930,7 +982,22 @@ function atualizarResultado(faixaForcada) {
     return;
   }
 
-  const resultado = calcularPrecoVenda({ custoProduto, custoEmbalagem, custoOperacional, lucro, taxaPercentual, taxaFixa, comissaoMinima });
+  let resultado;
+  if (modoCalculo === "preco_alvo") {
+    const pAlvo = precoAlvoInputVal;
+    let valorTaxaPercentual = pAlvo * (taxaPercentual / 100);
+    let comissaoMinimaAplicada = false;
+    if (comissaoMinima > 0 && valorTaxaPercentual < comissaoMinima) {
+      comissaoMinimaAplicada = true;
+      valorTaxaPercentual = comissaoMinima;
+    }
+    const liquido = pAlvo - taxaFixa - valorTaxaPercentual;
+    lucro = liquido - custoBase;
+    custoTotal = custoBase + lucro;
+    resultado = { custoTotal, precoVenda: pAlvo, valorTaxaPercentual, liquido, comissaoMinimaAplicada };
+  } else {
+    resultado = calcularPrecoVenda({ custoProduto, custoEmbalagem, custoOperacional, lucro, taxaPercentual, taxaFixa, comissaoMinima });
+  }
 
   const simularPromo = document.getElementById("calcSimularPromo")?.checked || false;
   const precoPromocional = Number(document.getElementById("calcPromoPreco")?.value) || 0;
@@ -979,7 +1046,7 @@ function atualizarResultado(faixaForcada) {
   }
 
   if (simularPromo && precoPromocional > 0) {
-    const originalLucroText = lucroTipo === "percentual" ? `${lucroInput.toFixed(2)}% (${formatCurrency(lucro)})` : formatCurrency(lucro);
+    const originalLucroText = lucroTipo === "percentual" && modoCalculo !== "preco_alvo" ? `${lucroInput.toFixed(2)}% (${formatCurrency(lucro)})` : formatCurrency(lucro);
     resLucroEl.innerHTML = `<span class="text-muted text-decoration-line-through me-1">${originalLucroText}</span> <span class="${colorClass} fw-semibold">${formatCurrency(lucroFinal)} (Margem: ${margemLiquida.toFixed(1)}%)</span>`;
   } else {
     resLucroEl.innerHTML = `<span class="${colorClass} fw-semibold">${formatCurrency(lucroFinal)} (Margem: ${margemLiquida.toFixed(1)}%)</span>`;
@@ -987,8 +1054,6 @@ function atualizarResultado(faixaForcada) {
 
   document.getElementById("resTaxaFixa").textContent = formatCurrency(taxaFixa);
 
-  // Quando o piso de comissão entra em ação, mostrar "8% (R$ 1,00)" seria
-  // mentira: o que foi cobrado é o mínimo, não o percentual da categoria.
   const resTaxaPercentualEl = document.getElementById("resTaxaPercentual");
   if (resultadoFinal.comissaoMinimaAplicada) {
     const nominal = resultadoFinal.precoVenda * (taxaPercentual / 100);
@@ -1002,6 +1067,27 @@ function atualizarResultado(faixaForcada) {
     resLiquidoEl.innerHTML = `<span class="text-muted text-decoration-line-through me-1">${formatCurrency(resultado.liquido)}</span> <span class="fw-bold">${formatCurrency(liquidoFinal)}</span>`;
   } else {
     resLiquidoEl.innerHTML = `<span>${formatCurrency(resultado.liquido)}</span>`;
+  }
+
+  // --- BOTÕES DE ARREDONDAMENTO PSICOLÓGICO ---
+  renderBotoesArredondamento(resultado.precoVenda);
+
+  // --- BARRA VISUAL DE DISTRIBUIÇÃO (BREAKDOWN) ---
+  const taxasTotal = (resultadoFinal.valorTaxaPercentual || 0) + (taxaFixa || 0);
+  renderBreakdownBar(resultadoFinal.precoVenda, custoBase, taxasTotal, lucroFinal);
+
+  // --- MÉTRICAS DE ADS (ROAS & CAC) ---
+  renderAdsMetrics(resultadoFinal.precoVenda, lucroFinal);
+
+  // --- ALERTA MERCADO LIVRE FRETE GRÁTIS (>= R$ 79) ---
+  const mlFreteAviso = document.getElementById("mlFreteGratisAviso");
+  if (mlFreteAviso) {
+    const isML = lojaNome.trim().toLowerCase().includes("mercado livre");
+    if (isML && resultadoFinal.precoVenda >= 79) {
+      mlFreteAviso.classList.remove("d-none");
+    } else {
+      mlFreteAviso.classList.add("d-none");
+    }
   }
 
   // Verifica se o lucro promocional gerou prejuízo e exibe alerta no compWrapper
@@ -1082,12 +1168,11 @@ function atualizarResultado(faixaForcada) {
     
     if (id) {
       if (id === selectedLojaId) {
-        // Para a loja ativa no formulário principal, respeita o valor exibido na tela
         pct = taxaPercentual;
         fix = taxaFixa;
       } else {
-        // Para as demais lojas comparadas, usa as faixas inteligentes da própria loja
-        const faixa = obterFaixaConsistente(name, custoTotal);
+        const baseParaFaixa = modoCalculo === "preco_alvo" && precoAlvoInputVal > 0 ? precoAlvoInputVal : custoTotal;
+        const faixa = obterFaixaConsistente(name, baseParaFaixa);
         if (faixa) {
           pct = faixa.taxaPercentual;
           fix = faixa.taxaFixa;
@@ -1101,12 +1186,27 @@ function atualizarResultado(faixaForcada) {
       fix = taxaFixa;
     }
     
-    return calcularPrecoVenda({
+    const cMin = obterComissaoMinima(name);
+
+    if (modoCalculo === "preco_alvo" && precoAlvoInputVal > 0) {
+      let vTaxa = precoAlvoInputVal * (pct / 100);
+      let cMinAp = false;
+      if (cMin > 0 && vTaxa < cMin) {
+        cMinAp = true;
+        vTaxa = cMin;
+      }
+      const liq = precoAlvoInputVal - fix - vTaxa;
+      const luc = liq - custoBase;
+      return { custoTotal: custoBase + luc, precoVenda: precoAlvoInputVal, valorTaxaPercentual: vTaxa, liquido: liq, comissaoMinimaAplicada: cMinAp, lucro: luc };
+    }
+
+    const cRes = calcularPrecoVenda({
       custoProduto, custoEmbalagem, custoOperacional, lucro,
       taxaPercentual: pct,
       taxaFixa: fix,
-      comissaoMinima: obterComissaoMinima(name)
+      comissaoMinima: cMin
     });
+    return { ...cRes, lucro };
   };
 
   const multiWrapper = document.getElementById("resultadoMultiploWrapper");
@@ -1125,7 +1225,7 @@ function atualizarResultado(faixaForcada) {
       tr.innerHTML = `
         <td class="fw-semibold">${escapeHtml(nomeLoja)}</td>
         <td class="text-end fw-bold text-primary">${formatCurrency(res.precoVenda)}</td>
-        <td class="text-end text-success">${formatCurrency(lucro)}</td>
+        <td class="text-end ${res.lucro < 0 ? 'text-danger' : 'text-success'}">${formatCurrency(res.lucro)}</td>
         <td class="text-end">${formatCurrency(res.liquido)}</td>
       `;
       multiTbody.appendChild(tr);
@@ -1149,7 +1249,8 @@ function atualizarResultado(faixaForcada) {
         pct = taxaPercentual;
         fix = taxaFixa;
       } else {
-        const faixa = obterFaixaConsistente(name, custoTotal);
+        const baseParaFaixa = modoCalculo === "preco_alvo" && precoAlvoInputVal > 0 ? precoAlvoInputVal : custoTotal;
+        const faixa = obterFaixaConsistente(name, baseParaFaixa);
         if (faixa) {
           pct = faixa.taxaPercentual;
           fix = faixa.taxaFixa;
@@ -1163,9 +1264,6 @@ function atualizarResultado(faixaForcada) {
       fix = taxaFixa;
     }
 
-    // Se o piso de comissão da loja entrou em ação, o percentual da categoria
-    // não foi o que saiu do bolso — guardamos a taxa efetiva para o histórico
-    // refazer a conta e chegar no mesmo líquido.
     if (res.comissaoMinimaAplicada && res.precoVenda > 0) {
       pct = (res.valorTaxaPercentual / res.precoVenda) * 100;
     }
@@ -1184,7 +1282,7 @@ function atualizarResultado(faixaForcada) {
       custo_produto: custoProduto,
       custo_embalagem: custoEmbalagem,
       custo_operacional: custoOperacional,
-      lucro_desejado: lucro,
+      lucro_desejado: res.lucro !== undefined ? res.lucro : lucro,
       taxa_percentual_usada: pct,
       taxa_fixa_usada: fix,
       preco_venda: res.precoVenda,
@@ -1198,7 +1296,7 @@ function atualizarResultado(faixaForcada) {
 
   const btnCopiar = document.getElementById("btnCopiarPreco");
   if (btnCopiar) {
-    const precoVal = resultado.precoVenda;
+    const precoVal = resultadoFinal.precoVenda;
     if (precoVal > 0) {
       btnCopiar.classList.remove("d-none");
       btnCopiar.onclick = () => {
@@ -1220,6 +1318,214 @@ function atualizarResultado(faixaForcada) {
 
   // Renderiza as faixas com a faixa atual em destaque
   renderFaixas(lojaNome, faixaAtiva);
+}
+
+// Renderiza botões de arredondamento psicológico (.90, .99, .00, próx .90)
+function renderBotoesArredondamento(precoBase) {
+  const wrapper = document.getElementById("arredondamentoWrapper");
+  const container = document.getElementById("botoesArredondamento");
+  if (!wrapper || !container) return;
+
+  if (!precoBase || precoBase <= 0) {
+    wrapper.classList.add("d-none");
+    container.innerHTML = "";
+    return;
+  }
+
+  wrapper.classList.remove("d-none");
+
+  const intPart = Math.floor(precoBase);
+  const cents = precoBase - intPart;
+
+  const round90 = cents <= 0.90 ? intPart + 0.90 : intPart + 1.90;
+  const round99 = cents <= 0.99 ? intPart + 0.99 : intPart + 1.99;
+  const round00 = Math.ceil(precoBase);
+  const next90 = (Math.ceil((precoBase + 0.1) / 10) * 10) - 0.10;
+
+  const opcoes = [];
+  opcoes.push({ rotulo: `.90 (${formatCurrency(round90)})`, valor: round90 });
+  opcoes.push({ rotulo: `.99 (${formatCurrency(round99)})`, valor: round99 });
+  if (round00 !== round90 && round00 !== round99) {
+    opcoes.push({ rotulo: `.00 (${formatCurrency(round00)})`, valor: round00 });
+  }
+  if (next90 > round99 && next90 !== round90) {
+    opcoes.push({ rotulo: `${formatCurrency(next90)}`, valor: next90 });
+  }
+
+  container.innerHTML = opcoes.map(op => `
+    <button type="button" class="sa-round-btn" data-round-val="${op.valor.toFixed(2)}">
+      ${escapeHtml(op.rotulo)}
+    </button>
+  `).join("");
+
+  container.querySelectorAll("[data-round-val]").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const val = Number(e.currentTarget.dataset.roundVal);
+      const modoCalculo = document.querySelector('input[name="calcModoCalculo"]:checked')?.value || "margem";
+      
+      if (modoCalculo === "preco_alvo") {
+        const inputAlvo = document.getElementById("calcPrecoAlvoInput");
+        if (inputAlvo) inputAlvo.value = val.toFixed(2);
+      } else {
+        const promoCheck = document.getElementById("calcSimularPromo");
+        const promoFields = document.getElementById("calcPromoFields");
+        const promoInput = document.getElementById("calcPromoPreco");
+        const inputDesc = document.getElementById("calcPromoDesconto");
+        if (promoCheck) promoCheck.checked = true;
+        promoFields?.classList.remove("d-none");
+        if (promoInput) promoInput.value = val.toFixed(2);
+        if (inputDesc && precoBase > 0) {
+          const desc = ((precoBase - val) / precoBase) * 100;
+          inputDesc.value = desc > 0 ? desc.toFixed(1) : "0";
+        }
+      }
+      showToast(`Preço ajustado para ${formatCurrency(val)}`);
+      atualizarResultado();
+    });
+  });
+}
+
+// Renderiza a barra visual de proporção do preço de venda (Breakdown)
+function renderBreakdownBar(precoVenda, custos, taxas, lucro) {
+  const totalEl = document.getElementById("breakdownTotalPreco");
+  const barCusto = document.getElementById("breakdownCusto");
+  const barTaxas = document.getElementById("breakdownTaxas");
+  const barLucro = document.getElementById("breakdownLucro");
+  const lblCusto = document.getElementById("breakdownCustoLabel");
+  const lblTaxas = document.getElementById("breakdownTaxasLabel");
+  const lblLucro = document.getElementById("breakdownLucroLabel");
+
+  if (!totalEl || !barCusto || !barTaxas || !barLucro) return;
+
+  if (!precoVenda || precoVenda <= 0) {
+    totalEl.textContent = "—";
+    barCusto.style.width = "0%";
+    barTaxas.style.width = "0%";
+    barLucro.style.width = "0%";
+    if (lblCusto) lblCusto.textContent = "0%";
+    if (lblTaxas) lblTaxas.textContent = "0%";
+    if (lblLucro) lblLucro.textContent = "0%";
+    return;
+  }
+
+  totalEl.textContent = formatCurrency(precoVenda);
+
+  const pctCusto = Math.min(100, Math.max(0, (custos / precoVenda) * 100));
+  const pctTaxas = Math.min(100, Math.max(0, (taxas / precoVenda) * 100));
+  const pctLucro = Math.min(100, Math.max(0, (lucro / precoVenda) * 100));
+
+  barCusto.style.width = `${pctCusto.toFixed(1)}%`;
+  barTaxas.style.width = `${pctTaxas.toFixed(1)}%`;
+  barLucro.style.width = `${pctLucro.toFixed(1)}%`;
+
+  if (lblCusto) lblCusto.textContent = `${pctCusto.toFixed(0)}% (${formatCurrency(custos)})`;
+  if (lblTaxas) lblTaxas.textContent = `${pctTaxas.toFixed(0)}% (${formatCurrency(taxas)})`;
+  if (lblLucro) lblLucro.textContent = `${pctLucro.toFixed(0)}% (${formatCurrency(lucro)})`;
+}
+
+// Renderiza o ponto de equilíbrio de anúncios (ROAS e CAC Máximo)
+function renderAdsMetrics(precoVenda, lucro) {
+  const roasEl = document.getElementById("resBreakevenROAS");
+  const cacEl = document.getElementById("resMaxCAC");
+  if (!roasEl || !cacEl) return;
+
+  if (!precoVenda || precoVenda <= 0 || lucro === undefined) {
+    roasEl.textContent = "—";
+    cacEl.textContent = "—";
+    return;
+  }
+
+  if (lucro > 0) {
+    const roas = precoVenda / lucro;
+    roasEl.innerHTML = `<span class="text-primary fw-bold">${roas.toFixed(1)}x</span>`;
+    cacEl.innerHTML = `<span class="text-success fw-bold">${formatCurrency(lucro)}</span>`;
+  } else {
+    roasEl.innerHTML = `<span class="text-danger small fw-semibold">Prejuízo</span>`;
+    cacEl.innerHTML = `<span class="text-danger fw-bold">R$ 0,00</span>`;
+  }
+}
+
+// Exporta o histórico completo para arquivo CSV (compatível com Excel / Google Sheets)
+function exportarHistoricoCSV() {
+  if (!historicoCache || historicoCache.length === 0) {
+    showToast("Nenhum cálculo salvo para exportar.", "warning");
+    return;
+  }
+
+  const cabecalhos = [
+    "Produto",
+    "Tipo",
+    "Loja",
+    "Custo Produto (R$)",
+    "Embalagem (R$)",
+    "Custo Operacional (R$)",
+    "Lucro Desejado (R$)",
+    "Taxa Percentual (%)",
+    "Taxa Fixa (R$)",
+    "Preço de Venda Sugerido (R$)",
+    "Promoção Ativa",
+    "Preço Promocional (R$)",
+    "Repasse Líquido (R$)",
+    "Margem Líquida (%)",
+    "Link de Venda",
+    "Link de Referência",
+    "Data de Cadastro"
+  ];
+
+  const linhas = historicoCache.map(c => {
+    const isKit = (c.nome_produto || "").includes("\u200B");
+    const cleanName = (c.nome_produto || "").split("\u200B")[0].trim();
+    const lojaNome = c.lojas_ecommerce?.nome || "Manual";
+    
+    const pVenda = c.promo_ativa && c.preco_promocional > 0 ? Number(c.preco_promocional) : Number(c.preco_venda);
+    const taxaPct = Number(c.taxa_percentual_usada) || 0;
+    const taxaFix = Number(c.taxa_fixa_usada) || 0;
+    const custoProd = Number(c.custo_produto) || 0;
+    const custoEmb = Number(c.custo_embalagem) || 0;
+    const custoOp = Number(c.custo_operacional) || 0;
+    
+    const valorTaxaPct = pVenda * (taxaPct / 100);
+    const liquido = pVenda - valorTaxaPct - taxaFix - custoEmb - custoOp;
+    const lucroReal = liquido - custoProd;
+    const margemPct = pVenda > 0 ? (lucroReal / pVenda) * 100 : 0;
+
+    const formatNum = (v) => Number(v || 0).toFixed(2).replace(".", ",");
+
+    return [
+      `"${cleanName.replace(/"/g, '""')}"`,
+      isKit ? "Kit / Combo" : "Unitário",
+      `"${lojaNome.replace(/"/g, '""')}"`,
+      formatNum(custoProd),
+      formatNum(custoEmb),
+      formatNum(custoOp),
+      formatNum(c.lucro_desejado),
+      formatNum(taxaPct),
+      formatNum(taxaFix),
+      formatNum(c.preco_venda),
+      c.promo_ativa ? "Sim" : "Não",
+      c.preco_promocional ? formatNum(c.preco_promocional) : "",
+      formatNum(liquido),
+      formatNum(margemPct),
+      `"${(c.link_venda || "").replace(/"/g, '""')}"`,
+      `"${(c.link_referencia || "").replace(/"/g, '""')}"`,
+      `"${formatTimestamp(c.created_at)}"`
+    ].join(";");
+  });
+
+  const csvContent = "\uFEFF" + [cabecalhos.join(";"), ...linhas].join("\r\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  const dataFormatada = new Date().toISOString().slice(0, 10);
+  link.setAttribute("download", `socioall_historico_precificacao_${dataFormatada}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+
+  showToast("Histórico exportado com sucesso!");
 }
 
 const calculadoraForm = document.getElementById("calculadoraForm");
@@ -1321,7 +1627,7 @@ document.getElementById("salvarCalculoBtn")?.addEventListener("click", async (e)
     showToast(idsParaExcluir.length > 0 ? "Cadastro atualizado no histórico (registro anterior substituído)." : "Cálculo salvo no histórico.");
     btn.disabled = true;
     await loadHistorico();
-    atualizarHintProdutoExistente(nomeNormalizado);
+    atualizarHintProdutoExistente(cleanNomeNormalizado);
   });
 });
 
@@ -1397,7 +1703,7 @@ function getGruposFiltrados() {
   }
 
   if (filtroApenasKits) {
-    grupos = grupos.filter(g => g.nome_produto.endsWith('\u200B'));
+    grupos = grupos.filter(g => g.nome_produto.includes('\u200B'));
   }
 
   if (historicoBuscaTermo) {
@@ -1427,6 +1733,13 @@ function preencherFormularioComCalculo(c) {
 
   document.getElementById("calcNomeProduto").value = cleanName;
   
+  const radioModoMargem = document.getElementById("calcModoMargem");
+  if (radioModoMargem) {
+    radioModoMargem.checked = true;
+    document.getElementById("wrapperCalcLucro")?.classList.remove("d-none");
+    document.getElementById("wrapperCalcPrecoAlvo")?.classList.add("d-none");
+  }
+
   const radioUnitario = document.getElementById("calcTipoUnitario");
   const radioKit = document.getElementById("calcTipoKit");
   const compWrapper = document.getElementById("calcKitComponentesWrapper");

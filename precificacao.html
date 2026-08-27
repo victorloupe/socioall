@@ -15,7 +15,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 <link rel="icon" type="image/png" href="logo-icon.png">
-<link href="css/style.css" rel="stylesheet">
+<link href="css/style.css?v=4" rel="stylesheet">
 </head>
 <body>
 
@@ -33,18 +33,31 @@
       <div class="row g-3 align-items-stretch">
         <div class="col-12 col-lg-6 d-flex flex-column">
           <div class="card-sa flex-fill d-flex flex-column">
-            <h2 class="h6 mb-2">Calcular preço de venda</h2>
+            <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2 mb-3 pb-2 border-bottom sa-calc-header-row">
+              <h2 class="h6 mb-0 text-dark fw-bold">Calcular preço de venda</h2>
+              <div class="btn-group sa-calc-mode-group" role="group" aria-label="Modo de cálculo">
+                <input type="radio" class="btn-check" name="calcModoCalculo" id="calcModoMargem" value="margem" checked autocomplete="off">
+                <label class="btn btn-outline-secondary btn-sm py-1 px-3 text-nowrap d-flex align-items-center justify-content-center" for="calcModoMargem" style="font-size: 0.72rem; cursor: pointer;">
+                  <i class="bi bi-percent me-1"></i>Por Margem
+                </label>
+
+                <input type="radio" class="btn-check" name="calcModoCalculo" id="calcModoPrecoAlvo" value="preco_alvo" autocomplete="off">
+                <label class="btn btn-outline-secondary btn-sm py-1 px-3 text-nowrap d-flex align-items-center justify-content-center" for="calcModoPrecoAlvo" style="font-size: 0.72rem; cursor: pointer;">
+                  <i class="bi bi-tag me-1"></i>Preço Alvo
+                </label>
+              </div>
+            </div>
 
             <form id="calculadoraForm" class="d-flex flex-column flex-fill">
               <div class="mb-2">
                 <div class="d-flex justify-content-between align-items-center mb-1">
                   <label class="form-label small mb-0" for="calcNomeProduto">Nome do produto</label>
-                  <div class="btn-group" role="group" aria-label="Tipo de produto" style="width: 140px; height: 24px;">
+                  <div class="btn-group" role="group" aria-label="Tipo de produto" style="width: 140px; height: 26px;">
                     <input type="radio" class="btn-check" name="calcTipoProduto" id="calcTipoUnitario" value="unitario" checked autocomplete="off">
-                    <label class="btn btn-outline-secondary btn-sm py-0 d-flex align-items-center justify-content-center" for="calcTipoUnitario" style="font-size: 0.7rem; cursor: pointer; flex: 1;">Unitário</label>
+                    <label class="btn btn-outline-secondary btn-sm py-0 text-nowrap d-flex align-items-center justify-content-center" for="calcTipoUnitario" style="font-size: 0.7rem; cursor: pointer; flex: 1;">Unitário</label>
 
                     <input type="radio" class="btn-check" name="calcTipoProduto" id="calcTipoKit" value="kit" autocomplete="off">
-                    <label class="btn btn-outline-secondary btn-sm py-0 d-flex align-items-center justify-content-center" for="calcTipoKit" style="font-size: 0.7rem; cursor: pointer; flex: 1;">Kit</label>
+                    <label class="btn btn-outline-secondary btn-sm py-0 text-nowrap d-flex align-items-center justify-content-center" for="calcTipoKit" style="font-size: 0.7rem; cursor: pointer; flex: 1;">Kit</label>
                   </div>
                 </div>
                 <div>
@@ -111,7 +124,7 @@
               </div>
 
               <div class="row g-2 mb-3">
-                <div class="col-12 col-sm-4">
+                <div class="col-12 col-sm-4" id="wrapperCalcLucro">
                   <label class="form-label small" for="calcLucro">Lucro desejado</label>
                   <div class="input-group">
                     <input type="number" step="0.01" min="0" class="form-control" id="calcLucro" value="30" required>
@@ -120,6 +133,10 @@
                       <option value="percentual" selected>%</option>
                     </select>
                   </div>
+                </div>
+                <div class="col-12 col-sm-4 d-none" id="wrapperCalcPrecoAlvo">
+                  <label class="form-label small text-primary fw-semibold" for="calcPrecoAlvoInput">Preço de venda alvo (R$)</label>
+                  <input type="number" step="0.01" min="0" class="form-control form-control-sm border-primary" id="calcPrecoAlvoInput" placeholder="Ex: 49.90">
                 </div>
                 <div class="col-6 col-sm-4">
                   <label class="form-label small" for="calcTaxaPercentual">Taxa da loja (%)</label>
@@ -223,8 +240,14 @@
             <table class="table table-sa table-resultado mb-0">
               <tbody>
                 <tr>
-                  <td class="fw-semibold">Preço de venda sugerido</td>
-                  <td class="text-end fw-bold sa-preco-destaque">
+                  <td class="fw-semibold">
+                    <div>Preço de venda sugerido</div>
+                    <div class="small text-muted fw-normal mt-1 d-none" id="arredondamentoWrapper">
+                      <span style="font-size: 0.68rem;">Arredondar:</span>
+                      <span class="sa-round-group d-inline-flex ms-1" id="botoesArredondamento"></span>
+                    </div>
+                  </td>
+                  <td class="text-end fw-bold sa-preco-destaque align-middle">
                     <div class="d-flex align-items-center justify-content-end gap-2">
                       <span id="resPrecoVenda">—</span>
                       <button type="button" class="btn btn-sm btn-link p-0 text-muted d-none" id="btnCopiarPreco" title="Copiar preço" aria-label="Copiar preço sugerido">
@@ -254,7 +277,62 @@
               </div>
             </div>
 
-            <div id="comparacaoPrecoWrapper" class="mt-3 p-3 rounded" style="background-color: var(--sa-bg); border: 1px solid var(--sa-border); min-height: 110px;">
+            <!-- Barra Visual de Distribuição de Custos (Breakdown) -->
+            <div class="sa-breakdown-container" id="breakdownContainer">
+              <div class="d-flex justify-content-between align-items-center mb-1.5">
+                <span class="small fw-semibold text-muted" style="font-size: 0.72rem;">Distribuição do Preço de Venda:</span>
+                <span class="small fw-bold text-dark" style="font-size: 0.72rem;" id="breakdownTotalPreco">—</span>
+              </div>
+              <div class="sa-breakdown-bar mb-1">
+                <div class="sa-breakdown-segment segment-custo" id="breakdownCusto" style="width: 33.3%;" title="Custos Base"></div>
+                <div class="sa-breakdown-segment segment-taxas" id="breakdownTaxas" style="width: 33.3%;" title="Taxas do Canal"></div>
+                <div class="sa-breakdown-segment segment-lucro" id="breakdownLucro" style="width: 33.4%;" title="Lucro Líquido"></div>
+              </div>
+              <div class="sa-breakdown-legend">
+                <div class="sa-breakdown-legend-item">
+                  <span class="sa-breakdown-dot" style="background: #475569;"></span>
+                  <span class="text-muted">Custos:</span>
+                  <strong id="breakdownCustoLabel">0%</strong>
+                </div>
+                <div class="sa-breakdown-legend-item">
+                  <span class="sa-breakdown-dot" style="background: #F59E0B;"></span>
+                  <span class="text-muted">Taxas:</span>
+                  <strong id="breakdownTaxasLabel">0%</strong>
+                </div>
+                <div class="sa-breakdown-legend-item">
+                  <span class="sa-breakdown-dot" style="background: #10B981;"></span>
+                  <span class="text-muted">Lucro:</span>
+                  <strong id="breakdownLucroLabel">0%</strong>
+                </div>
+              </div>
+            </div>
+
+            <!-- Métricas de Ads (Breakeven ROAS e CAC Máximo) -->
+            <div class="sa-ads-metrics-card d-flex justify-content-between align-items-center" id="adsMetricsCard">
+              <div class="sa-ads-metric-item">
+                <span class="sa-ads-metric-label"><i class="bi bi-bullseye text-primary me-1"></i>ROAS Mínimo (Equilíbrio)</span>
+                <span class="sa-ads-metric-val" id="resBreakevenROAS">—</span>
+              </div>
+              <div class="border-start ps-3 sa-ads-metric-item">
+                <span class="sa-ads-metric-label"><i class="bi bi-wallet2 text-primary me-1"></i>Teto de Anúncio (CAC Máx)</span>
+                <span class="sa-ads-metric-val" id="resMaxCAC">—</span>
+              </div>
+              <div class="d-none d-sm-block text-end small text-muted" style="font-size: 0.65rem; max-width: 130px; line-height: 1.25;">
+                Gasto máx. por venda para não ter prejuízo
+              </div>
+            </div>
+
+            <!-- Alerta Mercado Livre Frete Grátis (>= R$ 79) -->
+            <div class="sa-ml-frete-card d-none" id="mlFreteGratisAviso">
+              <div class="d-flex align-items-center gap-1 fw-semibold text-warning-emphasis">
+                <i class="bi bi-truck"></i> Regra de Frete Grátis (Mercado Livre ≥ R$ 79,00)
+              </div>
+              <div class="text-muted mt-1" style="font-size: 0.7rem;">
+                Taxa fixa de R$ 6,00 zerada. Lembre-se de lançar a coparticipação estimada de frete do Mercado Envios no campo <strong>Custo operacional</strong>.
+              </div>
+            </div>
+
+            <div id="comparacaoPrecoWrapper" class="mt-3 p-3 rounded" style="background-color: var(--sa-bg); border: 1px solid var(--sa-border); min-height: 100px;">
               <div class="text-center text-muted py-2 small">
                 <i class="bi bi-info-circle me-1"></i> Preencha o "Preço de referência" para comparar a competitividade do seu preço sugerido.
               </div>
@@ -271,7 +349,7 @@
           </div>
           <div class="d-flex flex-wrap gap-2 align-items-center w-100 w-md-auto justify-content-md-end">
             <!-- Busca no histórico -->
-            <div class="d-flex gap-2 align-items-center flex-grow-1" style="min-width: 260px; max-width: 450px;">
+            <div class="d-flex gap-2 align-items-center flex-grow-1" style="min-width: 240px; max-width: 420px;">
               <div class="position-relative flex-grow-1">
                 <i class="bi bi-search position-absolute top-50 translate-middle-y ms-2 text-muted" style="font-size: 0.85rem;"></i>
                 <input type="search" class="form-control ps-4" id="historicoBusca" placeholder="Buscar produto..." autocomplete="off">
@@ -280,10 +358,14 @@
                 <i class="bi bi-boxes"></i> Kits / Combos
               </button>
             </div>
+            <!-- Exportar CSV -->
+            <button type="button" class="btn btn-sm btn-outline-success d-flex align-items-center gap-1 text-nowrap py-2" id="btnExportarCSV" title="Exportar histórico completo para planilha CSV">
+              <i class="bi bi-file-earmark-spreadsheet"></i> Exportar CSV
+            </button>
             <!-- Selector para itens por página -->
             <div class="d-flex align-items-center gap-1">
               <span class="text-muted small text-nowrap">Mostrar:</span>
-              <select class="form-select form-select-sm" id="historicoItensPorPagina" style="width: 80px;">
+              <select class="form-select form-select-sm" id="historicoItensPorPagina" style="width: 75px;">
                 <option value="5">5</option>
                 <option value="10" selected>10</option>
                 <option value="20">20</option>
@@ -291,7 +373,7 @@
               </select>
             </div>
             <!-- Filtro de Lojas -->
-            <div style="min-width: 150px;">
+            <div style="min-width: 140px;">
               <select class="form-select form-select-sm" id="filtroHistoricoLoja">
                 <option value="">Todas as lojas</option>
               </select>
@@ -494,6 +576,6 @@
 <script src="js/common.js?v=2"></script>
 <script src="js/supabaseClient.js"></script>
 <script src="js/page-helpers.js"></script>
-<script src="js/precificacao.js?v=9"></script>
+<script src="js/precificacao.js?v=12"></script>
 </body>
 </html>
