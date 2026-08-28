@@ -14,6 +14,18 @@ let historicoBuscaTermo = "";
 let filtroApenasKits = false;
 let amazonAtualizacaoTentada = false;
 
+// Custos padrão (embalagem e operacional) cadastrados em "Gerenciar lojas".
+// Entram sozinhos em todo cálculo novo; continuam editáveis na hora do cálculo.
+let custosPadraoEmpresa = { embalagem: 0, operacional: 0 };
+// Falso quando as colunas de custo padrão ainda não existem no banco desta
+// instalação (sql/update_custos_padrao.sql não rodado): nesse caso a tela toda
+// continua funcionando, só sem os padrões.
+let custosPadraoSuportado = true;
+// Marca os campos que a pessoa editou à mão neste cálculo. Um campo editado
+// nunca é sobrescrito pelo padrão ao trocar de loja — só o botão "Voltar ao
+// padrão" (ou carregar outro cálculo do histórico) desfaz a marcação.
+let custosCalcEditados = { embalagem: false, operacional: false };
+
 async function initPrecificacao() {
   const ctx = await initAuthenticatedPage('precificacao');
   if (!ctx) return;
@@ -226,8 +238,172 @@ async function initPrecificacao() {
     });
   });
 
+  document.getElementById("calcCustoEmbalagem")?.addEventListener("input", () => {
+    custosCalcEditados.embalagem = true;
+    atualizarHintCustosPadrao();
+  });
+
+  document.getElementById("calcCustoOperacional")?.addEventListener("input", () => {
+    custosCalcEditados.operacional = true;
+    atualizarHintCustosPadrao();
+  });
+
+  document.getElementById("btnRestaurarCustosPadrao")?.addEventListener("click", () => {
+    custosCalcEditados = { embalagem: false, operacional: false };
+    aplicarCustosPadraoNaCalculadora();
+    atualizarResultado();
+  });
+
+  await loadCustosPadraoEmpresa();
   await loadLojas();
   await loadHistorico();
+}
+
+// ---------- Custos padrão de embalagem / operacional ----------
+
+// As colunas de custo padrão vieram depois (sql/update_custos_padrao.sql), então
+// podem não existir num banco mais antigo. Por isso a leitura é isolada: se ela
+// falhar, a calculadora segue normal, só sem preencher os padrões sozinha.
+async function loadCustosPadraoEmpresa() {
+  const { data, error } = await supabaseClient
+    .from("empresas")
+    .select("custo_embalagem_padrao, custo_operacional_padrao")
+    .eq("id", currentEmpresaId)
+    .maybeSingle();
+
+  if (error) {
+    custosPadraoSuportado = false;
+    const box = document.getElementById("custosPadraoForm");
+    if (box) {
+      box.querySelectorAll("input, button").forEach(el => { el.disabled = true; });
+    }
+    showToast("Custos padrão indisponíveis — rode sql/update_custos_padrao.sql no Supabase.", "warning");
+    return;
+  }
+
+  custosPadraoEmpresa = {
+    embalagem: Number(data?.custo_embalagem_padrao) || 0,
+    operacional: Number(data?.custo_operacional_padrao) || 0
+  };
+
+  const inputEmb = document.getElementById("empresaCustoEmbalagemPadrao");
+  const inputOper = document.getElementById("empresaCustoOperacionalPadrao");
+  if (inputEmb) inputEmb.value = custosPadraoEmpresa.embalagem.toFixed(2);
+  if (inputOper) inputOper.value = custosPadraoEmpresa.operacional.toFixed(2);
+}
+
+// Custo padrão que vale para uma loja: o cadastrado na própria loja quando
+// preenchido, senão o padrão da empresa.
+function custosPadraoParaLoja(lojaId) {
+  const loja = lojaId ? lojasCache.find(l => l.id === lojaId) : null;
+
+  const embLoja = loja && loja.custo_embalagem_padrao !== null && loja.custo_embalagem_padrao !== undefined
+    ? Number(loja.custo_embalagem_padrao)
+    : null;
+  const operLoja = loja && loja.custo_operacional_padrao !== null && loja.custo_operacional_padrao !== undefined
+    ? Number(loja.custo_operacional_padrao)
+    : null;
+
+  return {
+    embalagem: embLoja !== null ? embLoja : custosPadraoEmpresa.embalagem,
+    operacional: operLoja !== null ? operLoja : custosPadraoEmpresa.operacional,
+    embalagemDaLoja: embLoja !== null,
+    operacionalDaLoja: operLoja !== null,
+    lojaNome: loja ? loja.nome : "Manual"
+  };
+}
+
+// Custos que valem para uma loja dentro do cálculo atual: o que foi digitado à
+// mão tem prioridade; nos campos não editados, cada loja usa o próprio padrão
+// (é o que permite comparar canais com custos operacionais diferentes).
+function custosDoCalculoParaLoja(lojaId) {
+  const formEmbalagem = Number(document.getElementById("calcCustoEmbalagem").value) || 0;
+  const formOperacional = Number(document.getElementById("calcCustoOperacional").value) || 0;
+
+  // Sem as colunas de custo padrão no banco, todo mundo usa o que está na tela.
+  if (!custosPadraoSuportado) {
+    return { embalagem: formEmbalagem, operacional: formOperacional };
+  }
+
+  const padrao = custosPadraoParaLoja(lojaId);
+  return {
+    embalagem: custosCalcEditados.embalagem ? formEmbalagem : padrao.embalagem,
+    operacional: custosCalcEditados.operacional ? formOperacional : padrao.operacional
+  };
+}
+
+// Preenche os campos de embalagem/operacional com o padrão da loja selecionada,
+// respeitando o que já foi editado à mão neste cálculo.
+function aplicarCustosPadraoNaCalculadora() {
+  if (!custosPadraoSuportado) return;
+
+  const inputEmb = document.getElementById("calcCustoEmbalagem");
+  const inputOper = document.getElementById("calcCustoOperacional");
+  if (!inputEmb || !inputOper) return;
+
+  const padrao = custosPadraoParaLoja(selectedLojaId);
+  if (!custosCalcEditados.embalagem) inputEmb.value = padrao.embalagem.toFixed(2);
+  if (!custosCalcEditados.operacional) inputOper.value = padrao.operacional.toFixed(2);
+
+  atualizarHintCustosPadrao();
+}
+
+function atualizarHintCustosPadrao() {
+  const hint = document.getElementById("custosPadraoHint");
+  const texto = document.getElementById("custosPadraoHintTexto");
+  const btnRestaurar = document.getElementById("btnRestaurarCustosPadrao");
+  if (!hint || !texto || !btnRestaurar) return;
+
+  if (!custosPadraoSuportado) {
+    hint.classList.add("d-none");
+    return;
+  }
+
+  const padrao = custosPadraoParaLoja(selectedLojaId);
+  const editou = custosCalcEditados.embalagem || custosCalcEditados.operacional;
+  const origem = padrao.embalagemDaLoja || padrao.operacionalDaLoja
+    ? `padrão de ${padrao.lojaNome}`
+    : "padrão da empresa";
+
+  const valores = `embalagem ${formatCurrency(padrao.embalagem)} · operacional ${formatCurrency(padrao.operacional)}`;
+
+  if (editou) {
+    texto.innerHTML = `<i class="bi bi-pencil me-1"></i>Custos ajustados só para este cálculo. O ${escapeHtml(origem)} é ${valores}.`;
+    btnRestaurar.classList.remove("d-none");
+  } else {
+    texto.innerHTML = `<i class="bi bi-magic me-1"></i>Preenchido pelo ${escapeHtml(origem)} (${valores}). Pode editar — vale só para este cálculo.`;
+    btnRestaurar.classList.add("d-none");
+  }
+
+  hint.classList.remove("d-none");
+}
+
+const custosPadraoForm = document.getElementById("custosPadraoForm");
+if (custosPadraoForm) {
+  custosPadraoForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById("custosPadraoSubmitBtn");
+
+    await withLoadingButton(btn, "Salvando...", async () => {
+      const embalagem = Number(document.getElementById("empresaCustoEmbalagemPadrao").value) || 0;
+      const operacional = Number(document.getElementById("empresaCustoOperacionalPadrao").value) || 0;
+
+      const { error } = await supabaseClient
+        .from("empresas")
+        .update({ custo_embalagem_padrao: embalagem, custo_operacional_padrao: operacional })
+        .eq("id", currentEmpresaId);
+
+      if (error) {
+        showToast(friendlyErrorMessage(error, "Não foi possível salvar os custos padrão."), "error");
+        return;
+      }
+
+      custosPadraoEmpresa = { embalagem, operacional };
+      showToast("Custos padrão salvos. Todo cálculo novo já vem com eles.");
+      aplicarCustosPadraoNaCalculadora();
+      atualizarResultado();
+    });
+  });
 }
 
 function obterPrecoSugeridoSemPromo() {
@@ -254,12 +430,24 @@ function obterPrecoSugeridoSemPromo() {
 
 // ---------- Lojas / marketplaces ----------
 
+const COLUNAS_LOJA_BASE = "id, nome, taxa_percentual, taxa_fixa, link_referencia, observacoes, updated_at";
+const COLUNAS_LOJA_COM_CUSTOS = `${COLUNAS_LOJA_BASE}, custo_embalagem_padrao, custo_operacional_padrao`;
+
 async function loadLojas() {
-  const { data, error } = await supabaseClient
+  const selecionarLojas = (colunas) => supabaseClient
     .from("lojas_ecommerce")
-    .select("id, nome, taxa_percentual, taxa_fixa, link_referencia, observacoes, updated_at")
+    .select(colunas)
     .eq("empresa_id", currentEmpresaId)
     .order("nome", { ascending: true });
+
+  let { data, error } = await selecionarLojas(custosPadraoSuportado ? COLUNAS_LOJA_COM_CUSTOS : COLUNAS_LOJA_BASE);
+
+  // Banco antigo, sem as colunas de custo padrão: refaz a busca sem elas para a
+  // tela continuar funcionando (só sem o preenchimento automático dos custos).
+  if (error && custosPadraoSuportado) {
+    custosPadraoSuportado = false;
+    ({ data, error } = await selecionarLojas(COLUNAS_LOJA_BASE));
+  }
 
   if (error) {
     showToast(friendlyErrorMessage(error, "Não foi possível carregar as lojas."), "error");
@@ -673,6 +861,10 @@ function renderFaixas(lojaNome, faixaAtiva) {
 }
 
 function aplicarTaxaDaLojaSelecionada() {
+  // Antes da faixa: os custos padrão entram primeiro porque a faixa de taxa
+  // depende do custo total.
+  aplicarCustosPadraoNaCalculadora();
+
   const loja = lojasCache.find(l => l.id === selectedLojaId);
   const lojaNome = loja ? loja.nome : "Manual";
   const nameKey = lojaNome ? lojaNome.trim().toLowerCase() : "";
@@ -715,12 +907,31 @@ function aplicarTaxaDaLojaSelecionada() {
 }
 
 
+// Texto da coluna "Custos padrão" na tabela de lojas: mostra só o que a loja
+// sobrescreve; o resto ela herda da empresa.
+function custosPadraoDaLojaTexto(loja) {
+  if (!custosPadraoSuportado) return '<span class="text-muted">—</span>';
+
+  const partes = [];
+  if (loja.custo_embalagem_padrao !== null && loja.custo_embalagem_padrao !== undefined) {
+    partes.push(`Embalagem ${formatCurrency(loja.custo_embalagem_padrao)}`);
+  }
+  if (loja.custo_operacional_padrao !== null && loja.custo_operacional_padrao !== undefined) {
+    partes.push(`Operacional ${formatCurrency(loja.custo_operacional_padrao)}`);
+  }
+
+  if (partes.length === 0) {
+    return '<span class="text-muted">Padrão da empresa</span>';
+  }
+  return partes.join("<br>");
+}
+
 function renderLojasTable() {
   const tbody = document.getElementById("lojasTableBody");
   tbody.innerHTML = "";
 
   if (lojasCache.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" class="table-empty">Nenhuma loja cadastrada ainda.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="table-empty">Nenhuma loja cadastrada ainda.</td></tr>';
     return;
   }
 
@@ -756,6 +967,7 @@ function renderLojasTable() {
       </td>
       <td data-label="Taxa %" class="fw-semibold">${Number(l.taxa_percentual).toFixed(2)}%</td>
       <td data-label="Taxa fixa (R$)">${formatCurrency(l.taxa_fixa)}</td>
+      <td class="small" data-label="Custos padrão" style="font-size: 0.75rem;">${custosPadraoDaLojaTexto(l)}</td>
       <td class="small text-muted td-stack-full" data-label="Observações" style="max-width: 280px; font-size: 0.75rem;">${escapeHtml(l.observacoes || "—")}</td>
       <td class="small ${desatualizada ? "text-danger" : "text-muted"}" data-label="Atualizado em">
         ${atualizadoTexto}
@@ -782,6 +994,10 @@ function editarLoja(id) {
   document.getElementById("lojaTaxaFixa").value = loja.taxa_fixa;
   document.getElementById("lojaLinkReferencia").value = loja.link_referencia || "";
   document.getElementById("lojaObservacoes").value = loja.observacoes || "";
+  document.getElementById("lojaCustoEmbalagem").value =
+    loja.custo_embalagem_padrao !== null && loja.custo_embalagem_padrao !== undefined ? loja.custo_embalagem_padrao : "";
+  document.getElementById("lojaCustoOperacional").value =
+    loja.custo_operacional_padrao !== null && loja.custo_operacional_padrao !== undefined ? loja.custo_operacional_padrao : "";
 
   document.getElementById("lojaFormTitulo").textContent = `Editar ${loja.nome}`;
   document.getElementById("lojaSubmitBtn").innerHTML = '<i class="bi bi-check-lg me-1"></i>Salvar alterações';
@@ -794,6 +1010,8 @@ function cancelarEdicaoLoja() {
   document.getElementById("lojaEditId").value = "";
   document.getElementById("lojaTaxaPercentual").value = 0;
   document.getElementById("lojaTaxaFixa").value = 0;
+  document.getElementById("lojaCustoEmbalagem").value = "";
+  document.getElementById("lojaCustoOperacional").value = "";
   document.getElementById("lojaFormTitulo").textContent = "Adicionar loja";
   document.getElementById("lojaSubmitBtn").innerHTML = '<i class="bi bi-plus-lg me-1"></i>Adicionar loja';
   document.getElementById("lojaCancelEditBtn").classList.add("d-none");
@@ -863,6 +1081,8 @@ if (novaLojaForm) {
       const taxaFixa = Number(document.getElementById("lojaTaxaFixa").value);
       const linkReferencia = document.getElementById("lojaLinkReferencia").value.trim();
       const observacoes = document.getElementById("lojaObservacoes").value.trim();
+      const custoEmbalagem = document.getElementById("lojaCustoEmbalagem").value.trim();
+      const custoOperacional = document.getElementById("lojaCustoOperacional").value.trim();
 
       const payload = {
         nome,
@@ -871,6 +1091,12 @@ if (novaLojaForm) {
         link_referencia: linkReferencia || null,
         observacoes: observacoes || null
       };
+
+      // Campo em branco = a loja herda o custo padrão da empresa.
+      if (custosPadraoSuportado) {
+        payload.custo_embalagem_padrao = custoEmbalagem === "" ? null : Number(custoEmbalagem);
+        payload.custo_operacional_padrao = custoOperacional === "" ? null : Number(custoOperacional);
+      }
 
       const { error } = editId
         ? await supabaseClient.from("lojas_ecommerce").update(payload).eq("id", editId)
@@ -884,6 +1110,7 @@ if (novaLojaForm) {
       cancelarEdicaoLoja();
       showToast(editId ? "Taxa da loja atualizada." : "Loja adicionada.");
       await loadLojas();
+      atualizarResultado();
     });
   });
 }
@@ -1162,7 +1389,13 @@ function atualizarResultado(faixaForcada) {
   const obterCalculoParaLoja = (id) => {
     const l = id ? lojasCache.find(x => x.id === id) : null;
     const name = l ? l.nome : "Manual";
-    
+
+    // Cada loja entra com o seu custo padrão de embalagem/operacional. Nos
+    // campos que a pessoa editou à mão, vale o que ela digitou (para todas).
+    const custosLoja = custosDoCalculoParaLoja(id);
+    const custoBaseLoja = custoProduto + custosLoja.embalagem + custosLoja.operacional;
+    const lucroLoja = lucroTipo === "percentual" ? custoBaseLoja * (lucroInput / 100) : lucroInput;
+
     let pct = 0;
     let fix = 0;
     
@@ -1196,17 +1429,20 @@ function atualizarResultado(faixaForcada) {
         vTaxa = cMin;
       }
       const liq = precoAlvoInputVal - fix - vTaxa;
-      const luc = liq - custoBase;
-      return { custoTotal: custoBase + luc, precoVenda: precoAlvoInputVal, valorTaxaPercentual: vTaxa, liquido: liq, comissaoMinimaAplicada: cMinAp, lucro: luc };
+      const luc = liq - custoBaseLoja;
+      return { custoTotal: custoBaseLoja + luc, precoVenda: precoAlvoInputVal, valorTaxaPercentual: vTaxa, liquido: liq, comissaoMinimaAplicada: cMinAp, lucro: luc, custos: custosLoja };
     }
 
     const cRes = calcularPrecoVenda({
-      custoProduto, custoEmbalagem, custoOperacional, lucro,
+      custoProduto,
+      custoEmbalagem: custosLoja.embalagem,
+      custoOperacional: custosLoja.operacional,
+      lucro: lucroLoja,
       taxaPercentual: pct,
       taxaFixa: fix,
       comissaoMinima: cMin
     });
-    return { ...cRes, lucro };
+    return { ...cRes, lucro: lucroLoja, custos: custosLoja };
   };
 
   const multiWrapper = document.getElementById("resultadoMultiploWrapper");
@@ -1224,6 +1460,7 @@ function atualizarResultado(faixaForcada) {
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td class="fw-semibold">${escapeHtml(nomeLoja)}</td>
+        <td class="text-end text-muted">${formatCurrency(res.custos.embalagem + res.custos.operacional)}</td>
         <td class="text-end fw-bold text-primary">${formatCurrency(res.precoVenda)}</td>
         <td class="text-end ${res.lucro < 0 ? 'text-danger' : 'text-success'}">${formatCurrency(res.lucro)}</td>
         <td class="text-end">${formatCurrency(res.liquido)}</td>
@@ -1239,6 +1476,7 @@ function atualizarResultado(faixaForcada) {
 
   ultimoCalculosArray = selectedLojasIds.map(id => {
     const res = obterCalculoParaLoja(id);
+    const custosLoja = res.custos;
     const l = id ? lojasCache.find(x => x.id === id) : null;
     const name = l ? l.nome : "Manual";
     
@@ -1280,8 +1518,8 @@ function atualizarResultado(faixaForcada) {
       preco_referencia: precoReferencia || null,
       loja_id: id || null,
       custo_produto: custoProduto,
-      custo_embalagem: custoEmbalagem,
-      custo_operacional: custoOperacional,
+      custo_embalagem: custosLoja.embalagem,
+      custo_operacional: custosLoja.operacional,
       lucro_desejado: res.lucro !== undefined ? res.lucro : lucro,
       taxa_percentual_usada: pct,
       taxa_fixa_usada: fix,
@@ -1770,6 +2008,10 @@ function preencherFormularioComCalculo(c) {
   document.getElementById("calcCustoProduto").value = c.custo_produto || 0;
   document.getElementById("calcCustoEmbalagem").value = c.custo_embalagem || 0;
   document.getElementById("calcCustoOperacional").value = c.custo_operacional || 0;
+  // Os custos vieram do cálculo salvo: valem mais que o padrão, inclusive ao
+  // trocar de loja. O botão "Voltar ao padrão" devolve os valores cadastrados.
+  custosCalcEditados = { embalagem: true, operacional: true };
+  atualizarHintCustosPadrao();
 
   // Recarrega o lucro como percentual (%) calculando a margem original
   const custoBase = (c.custo_produto || 0) + (c.custo_embalagem || 0) + (c.custo_operacional || 0);

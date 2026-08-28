@@ -32,6 +32,7 @@ O projeto já está conectado a um Supabase real (`js/supabaseClient.js`). Para 
 - Colunas e policies para anexar comprovante a um lançamento (bucket `comprovantes`).
 - `site`, `endereco`, `logo_url`, `cnpj`, `telefone`, `email_contato` na tabela `empresas`, e a policy de **update** que faltava (sem ela, ninguém conseguia editar os dados da empresa pela interface).
 - Policies do bucket `logos` (logo da empresa).
+- `custo_embalagem_padrao` e `custo_operacional_padrao` em `empresas` e em `lojas_ecommerce` (custos padrão da calculadora de preços — veja abaixo).
 
 Se depois de tudo isso você ainda ver o erro **"Bucket not found"** ao salvar a logo ou um comprovante, confira se os buckets `logos`/`comprovantes` foram mesmo criados pela tela do Storage (não por SQL) — veja o passo 3 acima.
 
@@ -49,6 +50,16 @@ Sem essa variável configurada, o botão de resetar senha mostra um erro claro e
 ### Dados da empresa (nome, site, endereço, logo)
 
 Em **Configurações** (menu lateral), qualquer sócio pode editar o nome, site, endereço e logo da empresa. Esses dados aparecem no menu lateral de todas as telas internas — a tela de login continua com a marca do SócioAll, sem relação com a empresa cadastrada.
+
+### Custos padrão de embalagem e operacional (calculadora de preços)
+
+Em **Calculadora de Preços > Gerenciar lojas**, o bloco **"Custos padrão da empresa"** guarda o custo de embalagem e o custo operacional que você usa sempre. Todo cálculo novo já abre com esses dois campos preenchidos, sem precisar redigitar.
+
+Isso não engessa nada: na hora do cálculo os dois campos continuam editáveis como sempre foram. O valor digitado ali vale só para aquele cálculo — o padrão cadastrado não muda — e aparece o link **"Voltar ao padrão"** para desfazer.
+
+Cada loja também pode ter um custo próprio (campos *"Embalagem desta loja"* e *"Operacional desta loja"* no formulário de loja). Em branco, a loja herda o padrão da empresa; preenchido, o valor da loja tem prioridade — útil quando o canal muda o custo, como a coparticipação de frete do Mercado Livre no custo operacional. Ao trocar a loja selecionada na calculadora, os custos se ajustam sozinhos (menos nos campos que você já editou à mão), e a comparação entre canais usa o custo de cada loja.
+
+Se o seu banco já existia, rode **`sql/update_custos_padrao.sql`** no SQL Editor do Supabase (ou o `sql/schema_completo.sql` inteiro de novo, que já traz as colunas). Enquanto essa migração não roda, a tela continua funcionando normal — só sem o preenchimento automático, e com um aviso dizendo qual script rodar.
 
 ### Comprovantes em lançamentos
 
@@ -141,7 +152,7 @@ socioall-app/
 - Textos de usuário (nomes, descrições) são escapados antes de exibir, evitando XSS
 - Headers de segurança (CSP, X-Frame-Options, HSTS, etc.) configurados em `vercel.json`
 - Identidade visual baseada na logo (navy `#072150` + teal `#0EA79A`)
-- **Calculadora de preços de e-commerce** (`precificacao.html`): cadastro de lojas/marketplaces com taxa de comissão (% + taxa fixa por venda) — já vem com Mercado Livre, Shopee e Amazon pré-cadastrados com taxas de referência pesquisadas (editáveis, pois os marketplaces mudam a política com frequência; a tela mostra a data da última revisão e avisa quando está desatualizada). A calculadora soma custo do produto + embalagem (padrão R$ 1) + custo operacional + lucro desejado, e já embute a taxa da loja escolhida no preço de venda sugerido. Calcular não salva nada por padrão; só grava no histórico se você clicar em "Salvar no histórico" (com nome do produto, link de venda e link de referência).
+- **Calculadora de preços de e-commerce** (`precificacao.html`): cadastro de lojas/marketplaces com taxa de comissão (% + taxa fixa por venda) — já vem com Mercado Livre, Shopee e Amazon pré-cadastrados com taxas de referência pesquisadas (editáveis, pois os marketplaces mudam a política com frequência; a tela mostra a data da última revisão e avisa quando está desatualizada). A calculadora soma custo do produto + embalagem + custo operacional + lucro desejado, e já embute a taxa da loja escolhida no preço de venda sugerido. Embalagem e custo operacional vêm preenchidos do cadastro de **custos padrão** (por empresa, com custo próprio opcional por loja) e continuam editáveis em cada cálculo. Calcular não salva nada por padrão; só grava no histórico se você clicar em "Salvar no histórico" (com nome do produto, link de venda e link de referência).
 - **Pedidos** (`pedidos.html`): estrutura pronta (tabela `pedidos_ecommerce`) para uma futura integração automática com os marketplaces — por enquanto é só uma tela vazia, sem nenhuma sincronização ativa.
 
 ## Próximos passos sugeridos

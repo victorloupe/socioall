@@ -123,6 +123,13 @@
                 </div>
               </div>
 
+              <div class="d-flex flex-wrap align-items-center gap-2 mb-2 d-none" id="custosPadraoHint">
+                <span class="small text-muted" style="font-size: 0.72rem;" id="custosPadraoHintTexto"></span>
+                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none d-none" id="btnRestaurarCustosPadrao" style="font-size: 0.72rem;">
+                  <i class="bi bi-arrow-counterclockwise me-1"></i>Voltar ao padrão
+                </button>
+              </div>
+
               <div class="row g-2 mb-3">
                 <div class="col-12 col-sm-4" id="wrapperCalcLucro">
                   <label class="form-label small" for="calcLucro">Lucro desejado</label>
@@ -227,6 +234,7 @@
                   <thead>
                     <tr>
                       <th>Loja</th>
+                      <th class="text-end">Emb. + Oper.</th>
                       <th class="text-end">Preço Sugerido</th>
                       <th class="text-end">Lucro R$</th>
                       <th class="text-end">Recebe Líquido</th>
@@ -415,6 +423,31 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
       </div>
       <div class="modal-body">
+        <div class="border rounded p-3 mb-4">
+          <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2 mb-1">
+            <h3 class="h6 mb-0">Custos padrão da empresa</h3>
+            <span class="badge bg-light text-muted border small fw-normal">Entra sozinho em todo cálculo</span>
+          </div>
+          <p class="small text-muted mb-3" style="line-height: 1.35;">
+            Cadastre aqui o custo de embalagem e o custo operacional que você usa sempre. Todo cálculo novo já abre com esses valores preenchidos, e você continua podendo editá-los na hora de calcular — o valor digitado lá vale só para aquele cálculo, o padrão cadastrado não muda.
+          </p>
+          <form id="custosPadraoForm" class="row g-2 align-items-end">
+            <div class="col-6 col-sm-4">
+              <label class="form-label small" for="empresaCustoEmbalagemPadrao">Embalagem padrão (R$)</label>
+              <input type="number" step="0.01" min="0" class="form-control form-control-sm" id="empresaCustoEmbalagemPadrao" value="0" required>
+            </div>
+            <div class="col-6 col-sm-4">
+              <label class="form-label small" for="empresaCustoOperacionalPadrao">Custo operacional padrão (R$)</label>
+              <input type="number" step="0.01" min="0" class="form-control form-control-sm" id="empresaCustoOperacionalPadrao" value="0" required>
+            </div>
+            <div class="col-12 col-sm-4">
+              <button type="submit" class="btn btn-primary btn-sm w-100" id="custosPadraoSubmitBtn">
+                <i class="bi bi-check-lg me-1"></i>Salvar padrões
+              </button>
+            </div>
+          </form>
+        </div>
+
         <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2 mb-3 bg-light p-2.5 rounded border">
           <div class="small text-muted" style="line-height: 1.35;">
             Taxas de referência para <strong>Utilidades Domésticas</strong>. Você pode personalizar as taxas de cada loja ou sincronizar as recomendações atualizadas de 2026.
@@ -431,6 +464,7 @@
                 <th>Nome</th>
                 <th>Taxa %</th>
                 <th>Taxa fixa (R$)</th>
+                <th>Custos padrão</th>
                 <th>Observações</th>
                 <th>Atualizado em</th>
                 <th class="text-end">Ações</th>
@@ -483,6 +517,19 @@
               <div class="col-12 col-sm-4">
                 <label class="form-label small" for="lojaLinkReferencia">Link de referência (opcional)</label>
                 <input type="url" class="form-control form-control-sm" id="lojaLinkReferencia" placeholder="Página de taxas da loja">
+              </div>
+              <div class="col-6 col-sm-3">
+                <label class="form-label small" for="lojaCustoEmbalagem">Embalagem desta loja (R$)</label>
+                <input type="number" step="0.01" min="0" class="form-control form-control-sm" id="lojaCustoEmbalagem" placeholder="Padrão da empresa">
+              </div>
+              <div class="col-6 col-sm-3">
+                <label class="form-label small" for="lojaCustoOperacional">Operacional desta loja (R$)</label>
+                <input type="number" step="0.01" min="0" class="form-control form-control-sm" id="lojaCustoOperacional" placeholder="Padrão da empresa">
+              </div>
+              <div class="col-12 col-sm-6 d-flex align-items-end">
+                <span class="small text-muted" style="font-size: 0.72rem; line-height: 1.3;">
+                  Deixe os dois em branco para a loja usar o custo padrão da empresa. Preencha só quando o canal tiver um custo diferente (ex: frete do Mercado Livre no operacional).
+                </span>
               </div>
               <div class="col-12">
                 <label class="form-label small" for="lojaObservacoes">Observações (opcional)</label>
@@ -576,6 +623,6 @@
 <script src="js/common.js?v=2"></script>
 <script src="js/supabaseClient.js"></script>
 <script src="js/page-helpers.js"></script>
-<script src="js/precificacao.js?v=12"></script>
+<script src="js/precificacao.js?v=13"></script>
 </body>
 </html>

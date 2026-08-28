@@ -38,7 +38,9 @@ create table if not exists empresas (
   logo_url text,
   cnpj text,
   telefone text,
-  email_contato text
+  email_contato text,
+  custo_embalagem_padrao numeric(10,2) not null default 0.50,
+  custo_operacional_padrao numeric(10,2) not null default 0
 );
 
 -- Garante as colunas mesmo se a tabela já existia de uma instalação antiga.
@@ -48,6 +50,15 @@ alter table empresas add column if not exists logo_url text;
 alter table empresas add column if not exists cnpj text;
 alter table empresas add column if not exists telefone text;
 alter table empresas add column if not exists email_contato text;
+
+-- Custos padrão da empresa: a calculadora de preços já abre com esses valores
+-- preenchidos em embalagem e custo operacional, para não precisar redigitar o
+-- mesmo custo a cada cálculo. Continuam editáveis na hora do cálculo — o que
+-- for digitado ali vale só para aquele cálculo, o padrão fica intacto.
+-- A embalagem nasce em R$ 0,50, o valor que a calculadora usava fixo antes de
+-- existir esse cadastro.
+alter table empresas add column if not exists custo_embalagem_padrao numeric(10,2) not null default 0.50;
+alter table empresas add column if not exists custo_operacional_padrao numeric(10,2) not null default 0;
 
 create table if not exists socios (
   id uuid primary key default uuid_generate_v4(),
@@ -380,6 +391,13 @@ create table if not exists lojas_ecommerce (
 alter table lojas_ecommerce add column if not exists updated_at timestamptz;
 update lojas_ecommerce set updated_at = created_at where updated_at is null;
 alter table lojas_ecommerce alter column updated_at set default now();
+
+-- Custos padrão por loja (opcionais). Quando preenchidos, têm prioridade sobre
+-- os custos padrão da empresa naquela loja — útil quando o canal muda o custo,
+-- como a coparticipação de frete do Mercado Livre no custo operacional.
+-- Em branco (null) = a loja herda o padrão da empresa.
+alter table lojas_ecommerce add column if not exists custo_embalagem_padrao numeric(10,2);
+alter table lojas_ecommerce add column if not exists custo_operacional_padrao numeric(10,2);
 
 alter table lojas_ecommerce add column if not exists shopee_shop_id bigint;
 alter table lojas_ecommerce add column if not exists shopee_access_token text;
