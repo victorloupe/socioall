@@ -14,11 +14,276 @@ let historicoBuscaTermo = "";
 let filtroApenasKits = false;
 let amazonAtualizacaoTentada = false;
 
+const CONFIG_CALC_PADRAO_DEFAULT = {
+  embalagem_padrao: 0.50,
+  custo_operacional_padrao: 0.00,
+  lucro_padrao: 30,
+  lucro_tipo_padrao: "percentual",
+  modelos_embalagem: [
+    { id: "emb_env", nome: "Envelope / Saco Plástico", desc: "Até 30x40 cm (pequenos itens)", custo: 0.50 },
+    { id: "emb_cx_p", nome: "Caixa Pequena (P)", desc: "Até 20x15x10 cm", custo: 1.20 },
+    { id: "emb_cx_m", nome: "Caixa Média (M)", desc: "Até 30x20x15 cm", custo: 2.20 },
+    { id: "emb_cx_g", nome: "Caixa Grande (G)", desc: "Acima de 35 cm", custo: 3.80 },
+    { id: "emb_tubo", nome: "Tubo Postal / Canudo", desc: "Para cartazes / esteiras", custo: 4.50 }
+  ]
+};
+
+let configCalcAtual = { ...CONFIG_CALC_PADRAO_DEFAULT };
+
+function getConfigStorageKey() {
+  return `sa_config_calc_${currentEmpresaId || 'global'}`;
+}
+
+function loadConfigPadroes() {
+  try {
+    const raw = localStorage.getItem(getConfigStorageKey());
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      configCalcAtual = {
+        ...CONFIG_CALC_PADRAO_DEFAULT,
+        ...parsed,
+        modelos_embalagem: Array.isArray(parsed.modelos_embalagem) && parsed.modelos_embalagem.length > 0
+          ? parsed.modelos_embalagem
+          : CONFIG_CALC_PADRAO_DEFAULT.modelos_embalagem
+      };
+    } else {
+      configCalcAtual = { ...CONFIG_CALC_PADRAO_DEFAULT };
+    }
+  } catch (err) {
+    console.error("Erro ao carregar configurações padrão:", err);
+    configCalcAtual = { ...CONFIG_CALC_PADRAO_DEFAULT };
+  }
+}
+
+function saveConfigPadroes(novaConfig) {
+  try {
+    configCalcAtual = { ...configCalcAtual, ...novaConfig };
+    localStorage.setItem(getConfigStorageKey(), JSON.stringify(configCalcAtual));
+  } catch (err) {
+    console.error("Erro ao salvar configurações padrão:", err);
+  }
+}
+
+function preencherModalConfigPadrao() {
+  const inputEmb = document.getElementById("cfgGlobalEmbalagem");
+  const inputOp = document.getElementById("cfgGlobalOperacional");
+  const inputLucro = document.getElementById("cfgGlobalLucro");
+
+  if (inputEmb) inputEmb.value = configCalcAtual.embalagem_padrao ?? 0.50;
+  if (inputOp) inputOp.value = configCalcAtual.custo_operacional_padrao ?? 0.00;
+  if (inputLucro) inputLucro.value = configCalcAtual.lucro_padrao ?? 30;
+
+  renderEmbalagensConfigTable();
+}
+
+let editingEmbalagemIdx = null;
+
+function renderEmbalagensConfigTable() {
+  const tbody = document.getElementById("embalagensConfigTableBody");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  const modelos = configCalcAtual.modelos_embalagem || [];
+  if (modelos.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-2">Nenhum modelo de embalagem cadastrado.</td></tr>';
+    return;
+  }
+
+  modelos.forEach((m, idx) => {
+    const tr = document.createElement("tr");
+
+    if (editingEmbalagemIdx === idx) {
+      tr.className = "table-warning bg-opacity-25 align-middle";
+      tr.innerHTML = `
+        <td class="py-1">
+          <input type="text" class="form-control form-control-sm" id="editEmbNome_${idx}" value="${escapeHtml(m.nome)}" placeholder="Nome do modelo" required>
+        </td>
+        <td class="py-1">
+          <input type="text" class="form-control form-control-sm" id="editEmbDesc_${idx}" value="${escapeHtml(m.desc || '')}" placeholder="Dimensões / detalhes">
+        </td>
+        <td class="py-1 text-end">
+          <input type="number" step="0.01" min="0" class="form-control form-control-sm text-end" id="editEmbCusto_${idx}" value="${m.custo}" placeholder="0.00" required>
+        </td>
+        <td class="py-1 text-end text-nowrap">
+          <button type="button" class="btn btn-sm btn-success py-1 px-2 me-1" title="Salvar alterações" onclick="salvarEdicaoEmbalagem(${idx})">
+            <i class="bi bi-check-lg"></i>
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" title="Cancelar" onclick="cancelarEdicaoEmbalagem()">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </td>
+      `;
+    } else {
+      const isFirst = idx === 0;
+      const isLast = idx === modelos.length - 1;
+      tr.className = "align-middle";
+      tr.innerHTML = `
+        <td class="fw-semibold text-dark">${escapeHtml(m.nome)}</td>
+        <td class="text-muted small">${escapeHtml(m.desc || "—")}</td>
+        <td class="text-end fw-bold">${formatCurrency(m.custo)}</td>
+        <td class="text-end text-nowrap">
+          <div class="btn-group btn-group-sm" role="group" aria-label="Ações da embalagem">
+            <button type="button" class="btn btn-outline-secondary py-1 px-2" title="Mover para cima" onclick="moverModeloEmbalagem(${idx}, -1)" ${isFirst ? 'disabled style="opacity:0.35;"' : ''}>
+              <i class="bi bi-arrow-up" style="font-size: 0.75rem;"></i>
+            </button>
+            <button type="button" class="btn btn-outline-secondary py-1 px-2" title="Mover para baixo" onclick="moverModeloEmbalagem(${idx}, 1)" ${isLast ? 'disabled style="opacity:0.35;"' : ''}>
+              <i class="bi bi-arrow-down" style="font-size: 0.75rem;"></i>
+            </button>
+            <button type="button" class="btn btn-outline-primary py-1 px-2" title="Editar modelo (nome, detalhes e preço)" onclick="iniciarEdicaoEmbalagem(${idx})">
+              <i class="bi bi-pencil" style="font-size: 0.75rem;"></i>
+            </button>
+            <button type="button" class="btn btn-outline-danger py-1 px-2" title="Excluir modelo" onclick="excluirModeloEmbalagem(${idx})">
+              <i class="bi bi-trash" style="font-size: 0.75rem;"></i>
+            </button>
+          </div>
+        </td>
+      `;
+    }
+    tbody.appendChild(tr);
+  });
+}
+
+function iniciarEdicaoEmbalagem(idx) {
+  editingEmbalagemIdx = idx;
+  renderEmbalagensConfigTable();
+  setTimeout(() => {
+    document.getElementById(`editEmbNome_${idx}`)?.focus();
+  }, 50);
+}
+
+function cancelarEdicaoEmbalagem() {
+  editingEmbalagemIdx = null;
+  renderEmbalagensConfigTable();
+}
+
+function salvarEdicaoEmbalagem(idx) {
+  if (!configCalcAtual.modelos_embalagem || !configCalcAtual.modelos_embalagem[idx]) return;
+
+  const inputNome = document.getElementById(`editEmbNome_${idx}`);
+  const inputDesc = document.getElementById(`editEmbDesc_${idx}`);
+  const inputCusto = document.getElementById(`editEmbCusto_${idx}`);
+
+  const nome = inputNome?.value.trim();
+  const desc = inputDesc?.value.trim();
+  const custo = Number(inputCusto?.value);
+
+  if (!nome) {
+    showToast("Informe o nome do modelo de embalagem.", "warning");
+    inputNome?.focus();
+    return;
+  }
+  if (isNaN(custo) || custo < 0) {
+    showToast("Informe um custo válido para a embalagem.", "warning");
+    inputCusto?.focus();
+    return;
+  }
+
+  configCalcAtual.modelos_embalagem[idx].nome = nome;
+  configCalcAtual.modelos_embalagem[idx].desc = desc || "Embalagem personalizada";
+  configCalcAtual.modelos_embalagem[idx].custo = Number(custo.toFixed(2));
+
+  saveConfigPadroes({ modelos_embalagem: configCalcAtual.modelos_embalagem });
+  editingEmbalagemIdx = null;
+  renderEmbalagensConfigTable();
+  renderEmbalagensModalCards();
+  showToast(`Modelo "${nome}" atualizado com sucesso!`);
+}
+
+function moverModeloEmbalagem(idx, direcao) {
+  if (!configCalcAtual.modelos_embalagem) return;
+  const novoIdx = idx + direcao;
+  if (novoIdx < 0 || novoIdx >= configCalcAtual.modelos_embalagem.length) return;
+
+  const item = configCalcAtual.modelos_embalagem.splice(idx, 1)[0];
+  configCalcAtual.modelos_embalagem.splice(novoIdx, 0, item);
+
+  saveConfigPadroes({ modelos_embalagem: configCalcAtual.modelos_embalagem });
+  renderEmbalagensConfigTable();
+  renderEmbalagensModalCards();
+}
+
+function excluirModeloEmbalagem(idx) {
+  if (!configCalcAtual.modelos_embalagem) return;
+  const removido = configCalcAtual.modelos_embalagem.splice(idx, 1);
+  saveConfigPadroes({ modelos_embalagem: configCalcAtual.modelos_embalagem });
+  if (editingEmbalagemIdx === idx) editingEmbalagemIdx = null;
+  renderEmbalagensConfigTable();
+  renderEmbalagensModalCards();
+  if (removido && removido[0]) {
+    showToast(`Modelo "${removido[0].nome}" removido!`);
+  }
+}
+
+window.iniciarEdicaoEmbalagem = iniciarEdicaoEmbalagem;
+window.cancelarEdicaoEmbalagem = cancelarEdicaoEmbalagem;
+window.salvarEdicaoEmbalagem = salvarEdicaoEmbalagem;
+window.moverModeloEmbalagem = moverModeloEmbalagem;
+window.excluirModeloEmbalagem = excluirModeloEmbalagem;
+
+function renderEmbalagensModalCards() {
+  const container = document.getElementById("embalagensModalCardsContainer");
+  if (!container) return;
+  container.innerHTML = "";
+
+  const modelos = configCalcAtual.modelos_embalagem || [];
+  const atualVal = Number(document.getElementById("calcCustoEmbalagem")?.value) || 0;
+
+  modelos.forEach(m => {
+    const isAtivo = Math.abs(Number(m.custo) - atualVal) < 0.01;
+    const col = document.createElement("div");
+    col.className = "col-12 col-sm-6";
+    col.innerHTML = `
+      <div class="sa-emb-card ${isAtivo ? 'active' : ''}" data-emb-id="${m.id}" data-emb-custo="${m.custo}" data-emb-nome="${escapeHtml(m.nome)}">
+        <div class="d-flex align-items-center gap-2.5">
+          <div class="rounded-circle p-2 bg-light text-primary d-flex align-items-center justify-content-center" style="width: 38px; height: 38px; font-size: 1.1rem;">
+            <i class="bi bi-box-seam"></i>
+          </div>
+          <div>
+            <div class="fw-semibold text-dark" style="font-size: 0.85rem;">${escapeHtml(m.nome)}</div>
+            <div class="small text-muted" style="font-size: 0.72rem;">${escapeHtml(m.desc || "Embalagem padrão")}</div>
+          </div>
+        </div>
+        <div class="text-end">
+          <span class="badge bg-light text-dark border fw-bold" style="font-size: 0.82rem;">${formatCurrency(m.custo)}</span>
+          ${isAtivo ? '<div class="text-success small fw-semibold mt-0.5" style="font-size: 0.68rem;"><i class="bi bi-check-circle-fill me-0.5"></i>Atual</div>' : ''}
+        </div>
+      </div>
+    `;
+    container.appendChild(col);
+  });
+
+  container.querySelectorAll(".sa-emb-card").forEach(card => {
+    card.addEventListener("click", () => {
+      const custo = Number(card.dataset.embCusto) || 0;
+      const nome = card.dataset.embNome;
+      const inputEmb = document.getElementById("calcCustoEmbalagem");
+      if (inputEmb) {
+        inputEmb.value = custo.toFixed(2);
+        triggerHighlightInputs([inputEmb]);
+        checarPadroesLojaRestaurar();
+        atualizarResultado();
+
+        const badgeEl = document.getElementById("embalagemSelecionadaNomeBadge");
+        if (badgeEl) {
+          badgeEl.textContent = `Embalagem: ${nome} (${formatCurrency(custo)})`;
+          badgeEl.classList.remove("d-none");
+        }
+
+        showToast(`Embalagem "${nome}" aplicada (${formatCurrency(custo)})`);
+      }
+      const modalEl = document.getElementById("selecionarEmbalagemModal");
+      const modal = bootstrap.Modal.getInstance(modalEl);
+      if (modal) modal.hide();
+    });
+  });
+}
+
 async function initPrecificacao() {
   const ctx = await initAuthenticatedPage('precificacao');
   if (!ctx) return;
   currentEmpresaId = ctx.empresaId;
   currentSocioId = ctx.socioId;
+  loadConfigPadroes();
 
   document.getElementById("filtroHistoricoLoja")?.addEventListener("change", () => {
     // O filtro de loja é aplicado na tela (client-side): o cache completo
@@ -214,8 +479,6 @@ async function initPrecificacao() {
           observacoes: lojaAmazon.observacoes
         }).eq("id", lojaAmazon.id);
       }
-
-      showToast(`Plano da Amazon salvo: ${plano === "individual" ? "Individual (+R$ 2,00 por item)" : "Profissional (R$ 0 taxa fixa)"}`);
       
       const lojaAtiva = lojasCache.find(l => l.id === selectedLojaId);
       if (lojaAtiva && lojaAtiva.nome.trim().toLowerCase() === "amazon") {
@@ -226,9 +489,239 @@ async function initPrecificacao() {
     });
   });
 
+  // Modal de Escolher Embalagem
+  document.getElementById("btnAbrirModalEscolherEmbalagem")?.addEventListener("click", () => {
+    renderEmbalagensModalCards();
+    bootstrap.Modal.getOrCreateInstance(document.getElementById("selecionarEmbalagemModal")).show();
+  });
+
+  document.getElementById("btnIrParaConfigEmbalagens")?.addEventListener("click", () => {
+    const modalSel = bootstrap.Modal.getInstance(document.getElementById("selecionarEmbalagemModal"));
+    if (modalSel) modalSel.hide();
+
+    preencherModalConfigPadrao();
+    bootstrap.Modal.getOrCreateInstance(document.getElementById("configPadraoModal")).show();
+  });
+
+  // Modal de Configurações Padrão Globais
+  document.getElementById("btnAbrirConfigPadrao")?.addEventListener("click", () => {
+    preencherModalConfigPadrao();
+    calcularRateioOperacional();
+    const tabPadroesBtn = document.getElementById("tab-padroes-btn");
+    if (tabPadroesBtn) {
+      bootstrap.Tab.getOrCreateInstance(tabPadroesBtn).show();
+    }
+  });
+
+  // Ícone de Rateio no campo Custo Operacional -> abre a modal direto na aba de rateio
+  document.getElementById("btnAbrirModalRateioOp")?.addEventListener("click", () => {
+    preencherModalConfigPadrao();
+    calcularRateioOperacional();
+    const tabRateioBtn = document.getElementById("tab-rateio-btn");
+    if (tabRateioBtn) {
+      bootstrap.Tab.getOrCreateInstance(tabRateioBtn).show();
+    }
+    bootstrap.Modal.getOrCreateInstance(document.getElementById("configPadraoModal")).show();
+  });
+
+  document.getElementById("rateioTotalDespesas")?.addEventListener("input", calcularRateioOperacional);
+  document.getElementById("rateioQtdPedidos")?.addEventListener("input", calcularRateioOperacional);
+
+  // Definir o valor calculado pelo rateio como padrão global
+  document.getElementById("btnCopiarRateioParaPadrao")?.addEventListener("click", () => {
+    const resEl = document.getElementById("rateioResultadoUnitario");
+    const valor = Number(resEl?.dataset.valor) || 0;
+    const inputGlobalOp = document.getElementById("cfgGlobalOperacional");
+    if (inputGlobalOp) {
+      inputGlobalOp.value = valor.toFixed(2);
+      triggerHighlightInputs([inputGlobalOp]);
+    }
+    const tabPadroesBtn = document.getElementById("tab-padroes-btn");
+    if (tabPadroesBtn) {
+      bootstrap.Tab.getOrCreateInstance(tabPadroesBtn).show();
+    }
+    showToast(`Custo operacional padrão definido como ${formatCurrency(valor)}! Clique em Salvar.`);
+  });
+
+  // Aplicar o valor calculado pelo rateio direto na calculadora atual
+  document.getElementById("btnAplicarRateioCalculadora")?.addEventListener("click", () => {
+    const resEl = document.getElementById("rateioResultadoUnitario");
+    const valor = Number(resEl?.dataset.valor) || 0;
+    const inputOp = document.getElementById("calcCustoOperacional");
+    if (inputOp) {
+      inputOp.value = valor.toFixed(2);
+      triggerHighlightInputs([inputOp]);
+      checarPadroesLojaRestaurar();
+      atualizarResultado();
+      showToast(`Custo operacional de ${formatCurrency(valor)} aplicado à calculadora!`);
+    }
+    const modalEl = document.getElementById("configPadraoModal");
+    const modal = bootstrap.Modal.getInstance(modalEl);
+    if (modal) modal.hide();
+  });
+
+  // Adicionar novo tipo de embalagem
+  document.getElementById("btnAdicionarTipoEmbalagem")?.addEventListener("click", () => {
+    const inputNome = document.getElementById("novaEmbNome");
+    const inputDesc = document.getElementById("novaEmbDesc");
+    const inputCusto = document.getElementById("novaEmbCusto");
+
+    const nome = inputNome?.value.trim();
+    const desc = inputDesc?.value.trim();
+    const custo = Number(inputCusto?.value);
+
+    if (!nome) {
+      showToast("Informe o nome do modelo de embalagem.", "warning");
+      inputNome?.focus();
+      return;
+    }
+    if (isNaN(custo) || custo < 0) {
+      showToast("Informe um custo válido para a embalagem.", "warning");
+      inputCusto?.focus();
+      return;
+    }
+
+    if (!configCalcAtual.modelos_embalagem) {
+      configCalcAtual.modelos_embalagem = [];
+    }
+
+    configCalcAtual.modelos_embalagem.push({
+      id: "emb_" + Date.now(),
+      nome,
+      desc: desc || "Embalagem personalizada",
+      custo: Number(custo.toFixed(2))
+    });
+
+    saveConfigPadroes({ modelos_embalagem: configCalcAtual.modelos_embalagem });
+    renderEmbalagensConfigTable();
+    renderEmbalagensModalCards();
+
+    if (inputNome) inputNome.value = "";
+    if (inputDesc) inputDesc.value = "";
+    if (inputCusto) inputCusto.value = "";
+
+    showToast(`Modelo "${nome}" adicionado com sucesso!`);
+  });
+
+  // Salvar configurações padrão globais
+  document.getElementById("btnSalvarConfigPadrao")?.addEventListener("click", () => {
+    const emb = Number(document.getElementById("cfgGlobalEmbalagem")?.value) || 0;
+    const op = Number(document.getElementById("cfgGlobalOperacional")?.value) || 0;
+    const lucro = Number(document.getElementById("cfgGlobalLucro")?.value) || 30;
+
+    saveConfigPadroes({
+      embalagem_padrao: emb,
+      custo_operacional_padrao: op,
+      lucro_padrao: lucro
+    });
+
+    showToast("Configurações padrão salvas com sucesso!");
+    const modalEl = document.getElementById("configPadraoModal");
+    const modal = bootstrap.Modal.getInstance(modalEl);
+    if (modal) modal.hide();
+
+    // Se estiver em modo manual ou loja sem padrões específicos, atualiza os campos
+    const lojaAtiva = lojasCache.find(l => l.id === selectedLojaId);
+    if (!lojaAtiva || (lojaAtiva.embalagem_padrao === undefined || lojaAtiva.embalagem_padrao === null)) {
+      const inputEmb = document.getElementById("calcCustoEmbalagem");
+      if (inputEmb) inputEmb.value = emb.toFixed(2);
+    }
+    if (!lojaAtiva || (lojaAtiva.custo_operacional_padrao === undefined || lojaAtiva.custo_operacional_padrao === null)) {
+      const inputOp = document.getElementById("calcCustoOperacional");
+      if (inputOp) inputOp.value = op.toFixed(2);
+    }
+    checarPadroesLojaRestaurar();
+    atualizarResultado();
+  });
+
+  // Listener para monitorar alterações manuais e exibir botão de restaurar padrão
+  document.getElementById("calcCustoEmbalagem")?.addEventListener("input", () => {
+    checarPadroesLojaRestaurar();
+  });
+  document.getElementById("calcCustoOperacional")?.addEventListener("input", () => {
+    checarPadroesLojaRestaurar();
+  });
+
+  // Botões de restauração do padrão da loja ou global
+  document.getElementById("btnRestoreEmbalagem")?.addEventListener("click", () => {
+    const loja = lojasCache.find(l => l.id === selectedLojaId);
+    const padrao = Number(loja?.embalagem_padrao ?? configCalcAtual.embalagem_padrao ?? 0.50);
+    const input = document.getElementById("calcCustoEmbalagem");
+    if (input) {
+      input.value = padrao.toFixed(2);
+      triggerHighlightInputs([input]);
+      showToast(`Embalagem restaurada para o padrão (${formatCurrency(padrao)})`);
+      checarPadroesLojaRestaurar();
+      atualizarResultado();
+    }
+  });
+
+  document.getElementById("btnRestoreOperacional")?.addEventListener("click", () => {
+    const loja = lojasCache.find(l => l.id === selectedLojaId);
+    const padrao = Number(loja?.custo_operacional_padrao ?? configCalcAtual.custo_operacional_padrao ?? 0.00);
+    const input = document.getElementById("calcCustoOperacional");
+    if (input) {
+      input.value = padrao.toFixed(2);
+      triggerHighlightInputs([input]);
+      showToast(`Custo operacional restaurado para o padrão (${formatCurrency(padrao)})`);
+      checarPadroesLojaRestaurar();
+      atualizarResultado();
+    }
+  });
+
+  // Atalho de teclado: Ctrl + S ou Cmd + S para salvar no histórico
+  document.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+      const salvarBtn = document.getElementById("salvarCalculoBtn");
+      if (salvarBtn && !salvarBtn.disabled) {
+        e.preventDefault();
+        salvarBtn.click();
+      }
+    }
+  });
+
   await loadLojas();
   await loadHistorico();
 }
+
+function selecionarCanalUnico(lojaId) {
+  selectedLojaId = lojaId;
+  if (!selectedLojasIds.includes(lojaId)) {
+    selectedLojasIds.push(lojaId);
+  }
+  
+  const loja = lojaId ? lojasCache.find(l => l.id === lojaId) : null;
+  const lojaTabsLabel = document.getElementById("lojaTabsLabel");
+  if (lojaTabsLabel) {
+    lojaTabsLabel.innerHTML = `<i class="bi bi-shop text-primary me-2"></i>Loja / Marketplace (${loja ? loja.nome : "Manual"})`;
+  }
+  
+  aplicarTaxaDaLojaSelecionada();
+  renderLojaTabs();
+  atualizarResultado();
+}
+
+function copiarPrecoCanal(preco, el, event) {
+  if (event) {
+    event.stopPropagation();
+  }
+  const valToCopy = Number(preco).toFixed(2).replace(".", ",");
+  navigator.clipboard.writeText(valToCopy).then(() => {
+    if (el) {
+      const icon = el.querySelector("i") || el;
+      const originalClass = icon.className;
+      icon.className = "bi bi-check-lg text-success";
+      setTimeout(() => {
+        icon.className = originalClass;
+      }, 1200);
+    }
+  }).catch(err => {
+    console.error("Erro ao copiar preço:", err);
+  });
+}
+
+window.selecionarCanalUnico = selecionarCanalUnico;
+window.copiarPrecoCanal = copiarPrecoCanal;
 
 function obterPrecoSugeridoSemPromo() {
   const custoProduto = Number(document.getElementById("calcCustoProduto").value) || 0;
@@ -257,7 +750,7 @@ function obterPrecoSugeridoSemPromo() {
 async function loadLojas() {
   const { data, error } = await supabaseClient
     .from("lojas_ecommerce")
-    .select("id, nome, taxa_percentual, taxa_fixa, link_referencia, observacoes, updated_at")
+    .select("id, nome, taxa_percentual, taxa_fixa, embalagem_padrao, custo_operacional_padrao, link_referencia, observacoes, updated_at")
     .eq("empresa_id", currentEmpresaId)
     .order("nome", { ascending: true });
 
@@ -357,6 +850,12 @@ function renderLojaTabs() {
     selectedLojasIds = [selectedLojaId];
   } else if (!abas.some(a => a.id === selectedLojaId)) {
     selectedLojaId = "";
+  }
+
+  const lojaAtiva = lojasCache.find(l => l.id === selectedLojaId);
+  const lojaTabsLabel = document.getElementById("lojaTabsLabel");
+  if (lojaTabsLabel) {
+    lojaTabsLabel.innerHTML = `<i class="bi bi-shop text-primary me-2"></i>Loja / Marketplace (${lojaAtiva ? lojaAtiva.nome : "Manual"})`;
   }
 
   container.innerHTML = abas.map(a => {
@@ -492,24 +991,32 @@ const LOJAS_PADRAO_RECOMENDADAS = [
     nome: "Shopee",
     taxa_percentual: 20,
     taxa_fixa: 4,
+    embalagem_padrao: 0.50,
+    custo_operacional_padrao: 0,
     observacoes: "Taxa com Programa de Frete Grátis Extra: até R$79,99 = 20%+R$4; R$80–99,99 = 14%+R$16; R$100–199,99 = 14%+R$20; acima de R$200 = 14%+R$26."
   },
   {
     nome: "Mercado Livre",
     taxa_percentual: 12,
     taxa_fixa: 6,
+    embalagem_padrao: 0.50,
+    custo_operacional_padrao: 0,
     observacoes: "Utilidades Domésticas: Clássico (12%+R$6 até R$78,99; 12%+R$0 a partir de R$79). Premium (16,5%+R$6 até R$78,99; 16,5%+R$0 a partir de R$79)."
   },
   {
     nome: "Amazon",
     taxa_percentual: 15,
     taxa_fixa: 0,
+    embalagem_padrao: 0.50,
+    custo_operacional_padrao: 0,
     observacoes: "Comissão de Casa e Cozinha (utilidades domésticas): 15%, caindo para 8% em itens de até R$ 29,99. Plano Profissional: R$0 fixa."
   },
   {
     nome: "TikTok Shop",
     taxa_percentual: 12,
     taxa_fixa: 6,
+    embalagem_padrao: 0.50,
+    custo_operacional_padrao: 0,
     observacoes: "Taxa por faixa de preço (vendedor CNPJ): até R$49,99 = 10%+R$4,00 (ou 16% frete grátis); a partir de R$50,00 = 12%+R$6,00."
   }
 ];
@@ -519,30 +1026,40 @@ const PRESETS_LOJAS_FORM = {
     nome: "Shopee",
     taxa_percentual: 20,
     taxa_fixa: 4,
+    embalagem_padrao: 0.50,
+    custo_operacional_padrao: 0,
     observacoes: "Taxa com Programa de Frete Grátis Extra: até R$79,99 = 20%+R$4; R$80–99,99 = 14%+R$16; R$100–199,99 = 14%+R$20; acima de R$200 = 14%+R$26."
   },
   "ml_classico": {
     nome: "Mercado Livre",
     taxa_percentual: 12,
     taxa_fixa: 6,
+    embalagem_padrao: 0.50,
+    custo_operacional_padrao: 0,
     observacoes: "Anúncio Clássico (12%+R$6 até R$78,99; 12%+R$0 a partir de R$79). Categoria Casa e Utilidades."
   },
   "ml_premium": {
     nome: "Mercado Livre",
     taxa_percentual: 16.5,
     taxa_fixa: 6,
+    embalagem_padrao: 0.50,
+    custo_operacional_padrao: 0,
     observacoes: "Anúncio Premium (16,5%+R$6 até R$78,99; 16,5%+R$0 a partir de R$79). Inclui parcelamento sem juros."
   },
   "amazon": {
     nome: "Amazon",
     taxa_percentual: 15,
     taxa_fixa: 0,
+    embalagem_padrao: 0.50,
+    custo_operacional_padrao: 0,
     observacoes: "Comissão de Casa e Cozinha (utilidades domésticas): 15%, caindo para 8% em itens de até R$ 29,99. Plano Profissional: R$0 fixa."
   },
   "tiktok": {
     nome: "TikTok Shop",
     taxa_percentual: 12,
     taxa_fixa: 6,
+    embalagem_padrao: 0.50,
+    custo_operacional_padrao: 0,
     observacoes: "Taxa por faixa de preço (vendedor CNPJ): até R$49,99 = 10%+R$4,00 (ou 16% frete grátis); a partir de R$50,00 = 12%+R$6,00."
   }
 };
@@ -672,6 +1189,55 @@ function renderFaixas(lojaNome, faixaAtiva) {
   });
 }
 
+function triggerHighlightInputs(inputs) {
+  inputs.forEach(el => {
+    if (!el) return;
+    el.classList.remove("sa-input-highlight");
+    void el.offsetWidth;
+    el.classList.add("sa-input-highlight");
+  });
+}
+
+function checarPadroesLojaRestaurar() {
+  const loja = lojasCache.find(l => l.id === selectedLojaId);
+  const inputEmb = document.getElementById("calcCustoEmbalagem");
+  const inputOp = document.getElementById("calcCustoOperacional");
+  const wrapEmb = document.getElementById("restoreEmbalagemPadraoWrapper");
+  const wrapOp = document.getElementById("restoreOperacionalPadraoWrapper");
+  const textEmb = document.getElementById("restoreEmbalagemValorText");
+  const textOp = document.getElementById("restoreOperacionalValorText");
+
+  const padraoEmb = Number(loja?.embalagem_padrao ?? configCalcAtual.embalagem_padrao ?? 0.50);
+  const padraoOp = Number(loja?.custo_operacional_padrao ?? configCalcAtual.custo_operacional_padrao ?? 0.00);
+  const atualEmb = Number(inputEmb?.value ?? 0);
+  const atualOp = Number(inputOp?.value ?? 0);
+
+  if (Math.abs(padraoEmb - atualEmb) > 0.001) {
+    if (textEmb) textEmb.textContent = `Padrão: ${formatCurrency(padraoEmb)}`;
+    wrapEmb?.classList.remove("d-none");
+  } else {
+    wrapEmb?.classList.add("d-none");
+  }
+
+  if (Math.abs(padraoOp - atualOp) > 0.001) {
+    if (textOp) textOp.textContent = `Padrão: ${formatCurrency(padraoOp)}`;
+    wrapOp?.classList.remove("d-none");
+  } else {
+    wrapOp?.classList.add("d-none");
+  }
+}
+
+function calcularRateioOperacional() {
+  const totalDespesas = Number(document.getElementById("rateioTotalDespesas")?.value) || 0;
+  const qtdPedidos = Number(document.getElementById("rateioQtdPedidos")?.value) || 1;
+  const valorUnitario = qtdPedidos > 0 ? totalDespesas / qtdPedidos : 0;
+  const resultadoEl = document.getElementById("rateioResultadoUnitario");
+  if (resultadoEl) {
+    resultadoEl.textContent = formatCurrency(valorUnitario);
+    resultadoEl.dataset.valor = valorUnitario.toFixed(2);
+  }
+}
+
 function aplicarTaxaDaLojaSelecionada() {
   const loja = lojasCache.find(l => l.id === selectedLojaId);
   const lojaNome = loja ? loja.nome : "Manual";
@@ -684,7 +1250,30 @@ function aplicarTaxaDaLojaSelecionada() {
     autoCheckbox.checked = !!faixas;
   }
 
+  const inputsToHighlight = [];
+
+  const embVal = (loja && loja.embalagem_padrao !== undefined && loja.embalagem_padrao !== null)
+    ? Number(loja.embalagem_padrao)
+    : Number(configCalcAtual.embalagem_padrao ?? 0.50);
+  const inputEmb = document.getElementById("calcCustoEmbalagem");
+  if (inputEmb) {
+    inputEmb.value = embVal.toFixed(2);
+    inputsToHighlight.push(inputEmb);
+  }
+
+  const opVal = (loja && loja.custo_operacional_padrao !== undefined && loja.custo_operacional_padrao !== null)
+    ? Number(loja.custo_operacional_padrao)
+    : Number(configCalcAtual.custo_operacional_padrao ?? 0.00);
+  const inputOp = document.getElementById("calcCustoOperacional");
+  if (inputOp) {
+    inputOp.value = opVal.toFixed(2);
+    inputsToHighlight.push(inputOp);
+  }
+
   if (loja) {
+    const inputTaxaPct = document.getElementById("calcTaxaPercentual");
+    const inputTaxaFixa = document.getElementById("calcTaxaFixa");
+
     if (faixas && faixas.length > 0) {
       const custoProduto = Number(document.getElementById("calcCustoProduto")?.value) || 0;
       const custoEmbalagem = Number(document.getElementById("calcCustoEmbalagem")?.value) || 0;
@@ -697,21 +1286,27 @@ function aplicarTaxaDaLojaSelecionada() {
 
       const faixa = obterFaixaConsistente(lojaNome, custoTotal);
       if (faixa) {
-        document.getElementById("calcTaxaPercentual").value = faixa.taxaPercentual;
-        document.getElementById("calcTaxaFixa").value = faixa.taxaFixa;
+        if (inputTaxaPct) inputTaxaPct.value = faixa.taxaPercentual;
+        if (inputTaxaFixa) inputTaxaFixa.value = faixa.taxaFixa;
       } else {
-        document.getElementById("calcTaxaPercentual").value = loja.taxa_percentual;
-        document.getElementById("calcTaxaFixa").value = loja.taxa_fixa;
+        if (inputTaxaPct) inputTaxaPct.value = loja.taxa_percentual;
+        if (inputTaxaFixa) inputTaxaFixa.value = loja.taxa_fixa;
       }
     } else {
-      document.getElementById("calcTaxaPercentual").value = loja.taxa_percentual;
-      document.getElementById("calcTaxaFixa").value = loja.taxa_fixa;
+      if (inputTaxaPct) inputTaxaPct.value = loja.taxa_percentual;
+      if (inputTaxaFixa) inputTaxaFixa.value = loja.taxa_fixa;
     }
+
+    if (inputTaxaPct) inputsToHighlight.push(inputTaxaPct);
+    if (inputTaxaFixa) inputsToHighlight.push(inputTaxaFixa);
   } else {
     document.getElementById("calcTaxaPercentual").value = 0;
     document.getElementById("calcTaxaFixa").value = 0;
   }
   document.getElementById("calcLojaId").value = selectedLojaId;
+
+  triggerHighlightInputs(inputsToHighlight);
+  checarPadroesLojaRestaurar();
 }
 
 
@@ -737,7 +1332,7 @@ function renderLojasTable() {
     const atualizadoTexto = formatTimestamp(atualizadoEm);
 
     const nameLower = l.nome.toLowerCase().trim();
-    let badgeClass = "badge px-2 py-1 me-1";
+    let badgeClass = "badge px-2.5 py-1 me-1";
     if (nameLower.includes("shopee")) {
       badgeClass += " badge-store-shopee";
     } else if (nameLower.includes("tiktok")) {
@@ -750,26 +1345,71 @@ function renderLojasTable() {
       badgeClass += " badge-store-generic";
     }
 
+    const linkHtml = l.link_referencia 
+      ? `<a href="${escapeHtml(l.link_referencia)}" target="_blank" rel="noopener noreferrer" class="text-decoration-none text-muted small ms-1" title="Ver taxas oficiais"><i class="bi bi-box-arrow-up-right"></i></a>` 
+      : "";
+
     tr.innerHTML = `
-      <td data-label="Nome">
-        <span class="${badgeClass}" style="font-size: 0.75rem;">${escapeHtml(l.nome)}</span>
+      <td data-label="Loja">
+        <div class="d-flex align-items-center">
+          <span class="${badgeClass}" style="font-size: 0.78rem;">${escapeHtml(l.nome)}</span>
+          ${linkHtml}
+        </div>
       </td>
-      <td data-label="Taxa %" class="fw-semibold">${Number(l.taxa_percentual).toFixed(2)}%</td>
-      <td data-label="Taxa fixa (R$)">${formatCurrency(l.taxa_fixa)}</td>
-      <td class="small text-muted td-stack-full" data-label="Observações" style="max-width: 280px; font-size: 0.75rem;">${escapeHtml(l.observacoes || "—")}</td>
-      <td class="small ${desatualizada ? "text-danger" : "text-muted"}" data-label="Atualizado em">
+      <td data-label="Taxas">
+        <div class="d-flex align-items-center gap-1">
+          <span class="fw-bold text-dark">${Number(l.taxa_percentual).toFixed(2)}%</span>
+          <span class="text-muted small">+ ${formatCurrency(l.taxa_fixa)}</span>
+        </div>
+      </td>
+      <td data-label="Custos padrão">
+        <div class="d-flex flex-wrap gap-1">
+          <span class="badge bg-light text-dark border fw-normal" style="font-size: 0.7rem;">
+            <span class="text-muted">Emb:</span> <strong>${formatCurrency(l.embalagem_padrao || 0)}</strong>
+          </span>
+          <span class="badge bg-light text-dark border fw-normal" style="font-size: 0.7rem;">
+            <span class="text-muted">Op:</span> <strong>${formatCurrency(l.custo_operacional_padrao || 0)}</strong>
+          </span>
+        </div>
+      </td>
+      <td class="small text-muted td-stack-full" data-label="Observações" style="font-size: 0.73rem; line-height: 1.35; max-width: 320px;">
+        ${escapeHtml(l.observacoes || "—")}
+      </td>
+      <td class="small ${desatualizada ? "text-danger" : "text-muted"}" data-label="Atualizado em" style="font-size: 0.72rem; white-space: nowrap;">
         ${atualizadoTexto}
-        ${desatualizada ? '<br><i class="bi bi-exclamation-triangle-fill"></i> revisar taxa' : ""}
+        ${desatualizada ? '<div class="text-danger fw-semibold mt-0.5"><i class="bi bi-exclamation-triangle-fill me-1"></i>Revisar</div>' : ""}
       </td>
       <td class="text-end text-nowrap" data-label="Ações">
-        <button type="button" class="btn btn-sm btn-outline-secondary" aria-label="Editar loja ${escapeHtml(l.nome)}" onclick="editarLoja('${l.id}')"><i class="bi bi-pencil"></i></button>
-        <button type="button" class="btn btn-sm btn-outline-danger" aria-label="Excluir loja ${escapeHtml(l.nome)}" onclick="excluirLoja('${l.id}')"><i class="bi bi-trash"></i></button>
+        <button type="button" class="btn btn-sm btn-outline-primary py-1 px-2" title="Duplicar loja (criar variação)" aria-label="Duplicar loja ${escapeHtml(l.nome)}" onclick="duplicarLoja('${l.id}')"><i class="bi bi-copy"></i></button>
+        <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2 ms-1" title="Editar loja" aria-label="Editar loja ${escapeHtml(l.nome)}" onclick="editarLoja('${l.id}')"><i class="bi bi-pencil"></i></button>
+        <button type="button" class="btn btn-sm btn-outline-danger py-1 px-2 ms-1" title="Excluir loja" aria-label="Excluir loja ${escapeHtml(l.nome)}" onclick="excluirLoja('${l.id}')"><i class="bi bi-trash"></i></button>
       </td>
     `;
     tbody.appendChild(tr);
   });
 
   animateTableRows(tbody);
+}
+
+function duplicarLoja(id) {
+  const loja = lojasCache.find(l => l.id === id);
+  if (!loja) return;
+
+  document.getElementById("lojaEditId").value = "";
+  document.getElementById("lojaNome").value = `${loja.nome} (Variação)`;
+  document.getElementById("lojaTaxaPercentual").value = loja.taxa_percentual;
+  document.getElementById("lojaTaxaFixa").value = loja.taxa_fixa;
+  document.getElementById("lojaEmbalagemPadrao").value = loja.embalagem_padrao ?? 0;
+  document.getElementById("lojaCustoOperacionalPadrao").value = loja.custo_operacional_padrao ?? 0;
+  document.getElementById("lojaLinkReferencia").value = loja.link_referencia || "";
+  document.getElementById("lojaObservacoes").value = loja.observacoes || "";
+
+  document.getElementById("lojaFormTitulo").textContent = `Nova loja a partir de ${loja.nome}`;
+  document.getElementById("lojaSubmitBtn").innerHTML = '<i class="bi bi-plus-lg me-1"></i>Adicionar variação';
+  document.getElementById("lojaCancelEditBtn").classList.remove("d-none");
+  document.getElementById("lojaNome").focus();
+
+  showToast(`Dados de "${loja.nome}" copiados! Ajuste as taxas se desejar e clique em Adicionar.`);
 }
 
 function editarLoja(id) {
@@ -780,6 +1420,8 @@ function editarLoja(id) {
   document.getElementById("lojaNome").value = loja.nome;
   document.getElementById("lojaTaxaPercentual").value = loja.taxa_percentual;
   document.getElementById("lojaTaxaFixa").value = loja.taxa_fixa;
+  document.getElementById("lojaEmbalagemPadrao").value = loja.embalagem_padrao ?? 0;
+  document.getElementById("lojaCustoOperacionalPadrao").value = loja.custo_operacional_padrao ?? 0;
   document.getElementById("lojaLinkReferencia").value = loja.link_referencia || "";
   document.getElementById("lojaObservacoes").value = loja.observacoes || "";
 
@@ -794,6 +1436,8 @@ function cancelarEdicaoLoja() {
   document.getElementById("lojaEditId").value = "";
   document.getElementById("lojaTaxaPercentual").value = 0;
   document.getElementById("lojaTaxaFixa").value = 0;
+  document.getElementById("lojaEmbalagemPadrao").value = 0;
+  document.getElementById("lojaCustoOperacionalPadrao").value = 0;
   document.getElementById("lojaFormTitulo").textContent = "Adicionar loja";
   document.getElementById("lojaSubmitBtn").innerHTML = '<i class="bi bi-plus-lg me-1"></i>Adicionar loja';
   document.getElementById("lojaCancelEditBtn").classList.add("d-none");
@@ -811,6 +1455,8 @@ document.querySelectorAll("[data-loja-preset]").forEach(btn => {
     document.getElementById("lojaNome").value = preset.nome;
     document.getElementById("lojaTaxaPercentual").value = preset.taxa_percentual;
     document.getElementById("lojaTaxaFixa").value = preset.taxa_fixa;
+    document.getElementById("lojaEmbalagemPadrao").value = preset.embalagem_padrao ?? 0;
+    document.getElementById("lojaCustoOperacionalPadrao").value = preset.custo_operacional_padrao ?? 0;
     document.getElementById("lojaObservacoes").value = preset.observacoes;
     document.getElementById("lojaNome").focus();
   });
@@ -832,6 +1478,8 @@ document.getElementById("btnRestaurarLojasPadrao")?.addEventListener("click", as
         await supabaseClient.from("lojas_ecommerce").update({
           taxa_percentual: padrao.taxa_percentual,
           taxa_fixa: padrao.taxa_fixa,
+          embalagem_padrao: padrao.embalagem_padrao ?? 0.50,
+          custo_operacional_padrao: padrao.custo_operacional_padrao ?? 0,
           observacoes: padrao.observacoes
         }).eq("id", existente.id);
       } else {
@@ -861,6 +1509,8 @@ if (novaLojaForm) {
       const nome = document.getElementById("lojaNome").value.trim();
       const taxaPercentual = Number(document.getElementById("lojaTaxaPercentual").value);
       const taxaFixa = Number(document.getElementById("lojaTaxaFixa").value);
+      const embalagemPadrao = Number(document.getElementById("lojaEmbalagemPadrao").value) || 0;
+      const custoOperacionalPadrao = Number(document.getElementById("lojaCustoOperacionalPadrao").value) || 0;
       const linkReferencia = document.getElementById("lojaLinkReferencia").value.trim();
       const observacoes = document.getElementById("lojaObservacoes").value.trim();
 
@@ -868,6 +1518,8 @@ if (novaLojaForm) {
         nome,
         taxa_percentual: taxaPercentual,
         taxa_fixa: taxaFixa,
+        embalagem_padrao: embalagemPadrao,
+        custo_operacional_padrao: custoOperacionalPadrao,
         link_referencia: linkReferencia || null,
         observacoes: observacoes || null
       };
@@ -882,8 +1534,12 @@ if (novaLojaForm) {
       }
 
       cancelarEdicaoLoja();
-      showToast(editId ? "Taxa da loja atualizada." : "Loja adicionada.");
+      showToast(editId ? "Configuração da loja atualizada." : "Loja adicionada.");
       await loadLojas();
+      if (selectedLojaId === editId) {
+        aplicarTaxaDaLojaSelecionada();
+        atualizarResultado();
+      }
     });
   });
 }
@@ -952,6 +1608,11 @@ function atualizarResultado(faixaForcada) {
 
   const loja = lojasCache.find(l => l.id === selectedLojaId);
   const lojaNome = loja ? loja.nome : "Manual";
+
+  const resBadge = document.getElementById("resultadoLojaAtivaBadge");
+  if (resBadge) {
+    resBadge.textContent = "Canal Ativo: " + lojaNome;
+  }
 
   let faixaAtiva = null;
 
@@ -1037,11 +1698,34 @@ function atualizarResultado(faixaForcada) {
   const isPrejuizo = lucroFinal < 0;
   const colorClass = isPrejuizo ? "text-danger" : "text-success";
 
+  // --- SEMÁFORO DE LUCRATIVIDADE (INDICADOR VISUAL DE SAÚDE DA MARGEM) ---
+  const statusWrapper = document.getElementById("resMargemStatusWrapper");
+  const statusBadge = document.getElementById("resMargemStatusBadge");
+
   if (resLucroBox) {
-    if (isPrejuizo) {
-      resLucroBox.classList.add("sa-lucro-prejuizo");
-    } else {
-      resLucroBox.classList.remove("sa-lucro-prejuizo");
+    resLucroBox.classList.remove("sa-lucro-box-danger", "sa-lucro-box-danger-subtle", "sa-lucro-box-warning", "sa-lucro-box-good", "sa-lucro-box-excellent", "sa-lucro-prejuizo");
+
+    if (resultadoFinal.precoVenda > 0) {
+      if (statusWrapper) statusWrapper.classList.remove("d-none");
+      
+      if (lucroFinal <= 0) {
+        resLucroBox.classList.add("sa-lucro-box-danger");
+        if (statusBadge) statusBadge.innerHTML = `<span class="badge bg-danger text-white d-inline-flex align-items-center gap-1"><i class="bi bi-exclamation-octagon-fill"></i> Prejuízo (${margemLiquida.toFixed(1)}%)</span>`;
+      } else if (margemLiquida < 10) {
+        resLucroBox.classList.add("sa-lucro-box-danger-subtle");
+        if (statusBadge) statusBadge.innerHTML = `<span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 d-inline-flex align-items-center gap-1"><i class="bi bi-exclamation-triangle-fill"></i> Margem Crítica (${margemLiquida.toFixed(1)}%)</span>`;
+      } else if (margemLiquida < 20) {
+        resLucroBox.classList.add("sa-lucro-box-warning");
+        if (statusBadge) statusBadge.innerHTML = `<span class="badge bg-warning bg-opacity-25 text-warning-emphasis border border-warning border-opacity-50 d-inline-flex align-items-center gap-1"><i class="bi bi-exclamation-triangle-fill text-warning"></i> Margem Moderada (${margemLiquida.toFixed(1)}%)</span>`;
+      } else if (margemLiquida < 30) {
+        resLucroBox.classList.add("sa-lucro-box-good");
+        if (statusBadge) statusBadge.innerHTML = `<span class="badge bg-success bg-opacity-15 text-success border border-success border-opacity-25 d-inline-flex align-items-center gap-1"><i class="bi bi-check-circle-fill"></i> Margem Saudável (${margemLiquida.toFixed(1)}%)</span>`;
+      } else {
+        resLucroBox.classList.add("sa-lucro-box-excellent");
+        if (statusBadge) statusBadge.innerHTML = `<span class="badge bg-success text-white d-inline-flex align-items-center gap-1 shadow-xs"><i class="bi bi-shield-check"></i> Margem Excelente (${margemLiquida.toFixed(1)}%)</span>`;
+      }
+    } else if (statusWrapper) {
+      statusWrapper.classList.add("d-none");
     }
   }
 
@@ -1158,7 +1842,7 @@ function atualizarResultado(faixaForcada) {
     }
   }
 
-  // --- COMPARAÇÃO MULTICANAL ---
+  // --- COMPARAÇÃO MULTICANAL (CARDS VISUAIS LADO A LADO) ---
   const obterCalculoParaLoja = (id) => {
     const l = id ? lojasCache.find(x => x.id === id) : null;
     const name = l ? l.nome : "Manual";
@@ -1197,7 +1881,7 @@ function atualizarResultado(faixaForcada) {
       }
       const liq = precoAlvoInputVal - fix - vTaxa;
       const luc = liq - custoBase;
-      return { custoTotal: custoBase + luc, precoVenda: precoAlvoInputVal, valorTaxaPercentual: vTaxa, liquido: liq, comissaoMinimaAplicada: cMinAp, lucro: luc };
+      return { custoTotal: custoBase + luc, precoVenda: precoAlvoInputVal, valorTaxaPercentual: vTaxa, taxaFixa: fix, liquido: liq, comissaoMinimaAplicada: cMinAp, lucro: luc };
     }
 
     const cRes = calcularPrecoVenda({
@@ -1206,31 +1890,94 @@ function atualizarResultado(faixaForcada) {
       taxaFixa: fix,
       comissaoMinima: cMin
     });
-    return { ...cRes, lucro };
+    return { ...cRes, taxaFixa: fix, lucro };
   };
 
   const multiWrapper = document.getElementById("resultadoMultiploWrapper");
-  const multiTbody = document.getElementById("resultadoMultiploTableBody");
+  const multiCards = document.getElementById("resultadoMultiploCardsContainer");
+  const qtdBadge = document.getElementById("multiploQtdCanaisBadge");
   
-  if (selectedLojasIds.length > 1) {
+  if (selectedLojasIds.length > 1 && multiCards) {
     multiWrapper.classList.remove("d-none");
-    multiTbody.innerHTML = "";
-    
-    selectedLojasIds.forEach(id => {
+    if (qtdBadge) qtdBadge.textContent = `${selectedLojasIds.length} canais ativos`;
+    multiCards.innerHTML = "";
+
+    const canalResultados = selectedLojasIds.map(id => {
       const l = id ? lojasCache.find(x => x.id === id) : null;
       const nomeLoja = l ? l.nome : "Manual";
       const res = obterCalculoParaLoja(id);
-      
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td class="fw-semibold">${escapeHtml(nomeLoja)}</td>
-        <td class="text-end fw-bold text-primary">${formatCurrency(res.precoVenda)}</td>
-        <td class="text-end ${res.lucro < 0 ? 'text-danger' : 'text-success'}">${formatCurrency(res.lucro)}</td>
-        <td class="text-end">${formatCurrency(res.liquido)}</td>
-      `;
-      multiTbody.appendChild(tr);
+      const margem = res.precoVenda > 0 ? (res.lucro / res.precoVenda) * 100 : 0;
+      return { id, nomeLoja, ...res, margem };
     });
-  } else {
+
+    const maxMargem = Math.max(...canalResultados.map(c => c.margem));
+    const todosIguais = canalResultados.every(c => Math.abs(c.margem - maxMargem) < 0.01);
+
+    canalResultados.forEach(c => {
+      const isBest = !todosIguais && Math.abs(c.margem - maxMargem) < 0.01 && c.lucro > 0;
+      const isAtivoAtual = c.id === selectedLojaId;
+      const col = document.createElement("div");
+      col.className = "col-12 col-sm-6";
+
+      const nameLower = c.nomeLoja.toLowerCase();
+      let borderBrand = "#0D9488";
+      let icon = "bi-shop";
+
+      if (nameLower.includes("shopee")) { 
+        borderBrand = "#EE4D2D"; 
+        icon = "bi-bag-check-fill"; 
+      } else if (nameLower.includes("mercadolivre") || nameLower.includes("mercado livre")) { 
+        borderBrand = "#EAB308"; 
+        icon = "bi-cart-check-fill"; 
+      } else if (nameLower.includes("tiktok")) { 
+        borderBrand = "#0F172A"; 
+        icon = "bi-play-circle-fill"; 
+      } else if (nameLower.includes("amazon")) { 
+        borderBrand = "#0284C7"; 
+        icon = "bi-box-seam-fill"; 
+      }
+
+      col.innerHTML = `
+        <div class="card p-2 h-100 border rounded-3 sa-mini-channel-card ${isAtivoAtual ? 'border-primary bg-primary bg-opacity-10 shadow-xs' : 'bg-white'}" 
+             style="border-left: 3.5px solid ${borderBrand} !important; cursor: pointer;"
+             onclick="selecionarCanalUnico('${c.id}')"
+             title="${isAtivoAtual ? 'Canal ativo na calculadora' : 'Clique para focar a calculadora neste canal'}">
+          
+          <!-- Linha Superior: Ícone + Nome + Tag Maior Margem/Ativo + Preço Sugerido com Botão de Copiar -->
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <div class="d-flex align-items-center gap-1.5 text-truncate pe-1">
+              <i class="bi ${icon}" style="color: ${borderBrand}; font-size: 0.82rem;"></i>
+              <strong class="text-dark text-truncate" style="font-size: 0.78rem;">${escapeHtml(c.nomeLoja)}</strong>
+              ${isBest ? '<span class="badge bg-warning text-dark border py-0.5 px-1 fw-bold" style="font-size: 0.58rem;"><i class="bi bi-trophy-fill text-warning me-0.5"></i>Maior Margem</span>' : ''}
+              ${isAtivoAtual ? '<span class="badge bg-primary text-white py-0.5 px-1 fw-semibold" style="font-size: 0.58rem;">Ativo</span>' : ''}
+            </div>
+            <div class="d-flex align-items-center gap-1 text-nowrap">
+              <span class="h6 mb-0 fw-bold text-dark" style="font-size: 0.95rem;">${formatCurrency(c.precoVenda)}</span>
+              <button type="button" class="btn btn-sm btn-link p-0 text-muted sa-copy-btn" title="Copiar preço deste canal" onclick="copiarPrecoCanal(${c.precoVenda}, this, event)" style="font-size: 0.8rem; line-height: 1;" aria-label="Copiar preço">
+                <i class="bi bi-clipboard"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Linha Inferior: Lucro Líquido + Repasse + Taxas -->
+          <div class="d-flex justify-content-between align-items-center pt-1 border-top border-dark border-opacity-10" style="font-size: 0.69rem;">
+            <div>
+              <span class="text-muted">Lucro: </span>
+              <strong class="${c.lucro < 0 ? 'text-danger' : 'text-success'}">${formatCurrency(c.lucro)} <span class="fw-normal">(${c.margem.toFixed(1)}%)</span></strong>
+            </div>
+            <div class="text-nowrap">
+              <span class="text-muted">Repasse: </span>
+              <strong class="text-dark">${formatCurrency(c.liquido)}</strong>
+            </div>
+            <div class="text-nowrap text-muted" style="font-size: 0.65rem;">
+              Taxas: ${formatCurrency((c.valorTaxaPercentual || 0) + (c.taxaFixa || 0))}
+            </div>
+          </div>
+        </div>
+      `;
+      multiCards.appendChild(col);
+    });
+  } else if (multiWrapper) {
     multiWrapper.classList.add("d-none");
   }
 
@@ -1379,7 +2126,6 @@ function renderBotoesArredondamento(precoBase) {
           inputDesc.value = desc > 0 ? desc.toFixed(1) : "0";
         }
       }
-      showToast(`Preço ajustado para ${formatCurrency(val)}`);
       atualizarResultado();
     });
   });
@@ -1803,6 +2549,7 @@ function preencherFormularioComCalculo(c) {
   }
 
   atualizarResultado();
+  checarPadroesLojaRestaurar();
 }
 
 

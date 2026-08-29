@@ -1042,11 +1042,10 @@ h1, h2, h3, .h4, .h6 {
   }
 }
 
-/* Tabela do card de resultado da calculadora — linhas mais espaçadas para
-   preencher melhor o card (que agora tem a mesma altura da calculadora). */
+/* Tabela do card de resultado da calculadora — layout compacto e proporcional */
 .table-resultado td {
-  padding: 15px 10px;
-  font-size: 14px;
+  padding: 6px 8px;
+  font-size: 0.8rem;
 }
 
 /* Extraídos de style="" inline na calculadora de preços, para permitir uma
@@ -1057,7 +1056,7 @@ h1, h2, h3, .h4, .h6 {
 
 .sa-preco-destaque {
   color: var(--sa-primary);
-  font-size: 2rem;
+  font-size: 1.3rem;
 }
 
 .sa-preco-destaque-sm {
@@ -1820,8 +1819,8 @@ html.dark-theme #verCalculoTabs .nav-link.active {
   background: linear-gradient(135deg, var(--sa-card) 0%, var(--sa-bg) 100%);
   border: 1px solid var(--sa-border);
   border-radius: var(--sa-radius-sm);
-  padding: 16px;
-  margin-top: 16px;
+  padding: 8px 12px;
+  margin-top: 8px;
 }
 
 .sa-resumo-item {
@@ -1831,13 +1830,13 @@ html.dark-theme #verCalculoTabs .nav-link.active {
 }
 
 .sa-resumo-label {
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   color: var(--sa-text-secondary);
   font-weight: 500;
 }
 
 .sa-resumo-value {
-  font-size: 1rem;
+  font-size: 0.92rem;
   font-weight: 600;
   color: var(--sa-text);
 }
@@ -1846,19 +1845,20 @@ html.dark-theme #verCalculoTabs .nav-link.active {
   background-color: var(--sa-teal-light);
   border: 1px solid rgba(14, 167, 154, 0.15);
   border-radius: var(--sa-radius-sm);
-  padding: 12px;
-  margin-top: 10px;
+  padding: 8px 10px;
+  margin-top: 6px;
 }
 
 .sa-resumo-lucro-box .sa-resumo-label {
   color: var(--sa-teal-dark);
   font-weight: 600;
+  font-size: 0.8rem;
   font-family: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
 }
 
 .sa-resumo-lucro-box .sa-resumo-value {
   color: var(--sa-teal-dark);
-  font-size: 1.25rem;
+  font-size: 1.05rem;
   font-weight: 700;
 }
 
@@ -2038,8 +2038,8 @@ html.dark-theme .sa-socio-color-neutral { background-color: rgba(148, 163, 184, 
 
 /* Barra Visual de Distribuição de Custos (Breakdown) */
 .sa-breakdown-container {
-  margin-top: 12px;
-  padding: 10px 12px;
+  margin-top: 8px;
+  padding: 6px 10px;
   background-color: var(--sa-bg);
   border: 1px solid var(--sa-border);
   border-radius: var(--sa-radius-sm);
@@ -2047,7 +2047,7 @@ html.dark-theme .sa-socio-color-neutral { background-color: rgba(148, 163, 184, 
 
 .sa-breakdown-bar {
   display: flex;
-  height: 12px;
+  height: 8px;
   border-radius: 999px;
   overflow: hidden;
   background-color: #E2E8F0;
@@ -2074,10 +2074,10 @@ html.dark-theme .sa-socio-color-neutral { background-color: rgba(148, 163, 184, 
 .sa-breakdown-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 12px;
+  gap: 4px 10px;
   justify-content: space-between;
-  margin-top: 8px;
-  font-size: 0.72rem;
+  margin-top: 5px;
+  font-size: 0.68rem;
 }
 
 .sa-breakdown-legend-item {
@@ -2087,8 +2087,8 @@ html.dark-theme .sa-socio-color-neutral { background-color: rgba(148, 163, 184, 
 }
 
 .sa-breakdown-dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   flex-shrink: 0;
 }
@@ -2103,8 +2103,8 @@ html.dark-theme .sa-socio-color-neutral { background-color: rgba(148, 163, 184, 
 }
 
 .sa-round-btn {
-  font-size: 0.68rem;
-  padding: 2px 7px;
+  font-size: 0.65rem;
+  padding: 1.5px 6px;
   border-radius: 12px;
   border: 1px solid var(--sa-border);
   background-color: #FFFFFF;
@@ -2123,21 +2123,21 @@ html.dark-theme .sa-socio-color-neutral { background-color: rgba(148, 163, 184, 
 
 /* Card de Métricas de Ads (Breakeven) */
 .sa-ads-metrics-card {
-  margin-top: 12px;
-  padding: 10px 12px;
+  margin-top: 8px;
+  padding: 6px 10px;
   background-color: rgba(240, 249, 255, 0.7);
   border: 1px solid #BAE6FD;
   border-radius: var(--sa-radius-sm);
 }
 
 .sa-ads-metric-val {
-  font-size: 0.92rem;
+  font-size: 0.85rem;
   font-weight: 700;
   color: #0369A1;
 }
 
 .sa-ads-metric-label {
-  font-size: 0.68rem;
+  font-size: 0.65rem;
   color: #64748B;
 }
 
@@ -2182,5 +2182,211 @@ html.dark-theme .sa-socio-color-neutral { background-color: rgba(148, 163, 184, 
   }
 }
 
+/* Animação suave de pulso ao carregar novos valores na calculadora */
+@keyframes sa-pulse-highlight {
+  0% {
+    background-color: rgba(13, 148, 136, 0.22);
+    border-color: #0d9488 !important;
+    box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.2);
+  }
+  100% {
+    background-color: #ffffff;
+    border-color: #E2E8F0;
+    box-shadow: none;
+  }
+}
 
+.sa-input-highlight {
+  animation: sa-pulse-highlight 0.75s ease-out;
+}
+
+/* Badge/Botão de restauração do padrão da loja */
+.sa-restore-badge {
+  font-size: 0.68rem;
+  color: #64748B;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background-color: #F8FAFC;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px dashed #CBD5E1;
+}
+
+.sa-restore-badge:hover {
+  background-color: #F1F5F9;
+  color: #0F766E;
+  border-color: #0F766E;
+}
+
+/* Botões rápidos de preset de embalagem */
+.sa-emb-preset-btn {
+  font-size: 0.65rem;
+  padding: 1px 6px;
+  border-radius: 12px;
+  border: 1px solid #E2E8F0;
+  background-color: #FFFFFF;
+  color: #475569;
+  transition: all 0.15s;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sa-emb-preset-btn:hover {
+  background-color: #F1F5F9;
+  color: #0F766E;
+  border-color: #0F766E;
+}
+
+/* Cards de Escolha de Embalagem na Modal */
+.sa-emb-card {
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 10px 14px;
+  background-color: #FFFFFF;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-decoration: none;
+  color: inherit;
+}
+
+.sa-emb-card:hover {
+  border-color: #0D9488;
+  background-color: rgba(13, 148, 136, 0.04);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.sa-emb-card.active {
+  border-color: #0D9488;
+  background-color: rgba(13, 148, 136, 0.08);
+}
+
+/* Addon de tamanho fixo para deixar todos os balões/inputs da calculadora perfeitamente idênticos */
+.sa-addon-fixed {
+  width: 40px !important;
+  min-width: 40px !important;
+  max-width: 40px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  font-size: 0.76rem !important;
+  font-weight: 600 !important;
+  flex: 0 0 40px !important;
+}
+
+/* Select do tipo de lucro no input-group */
+.sa-lucro-tipo-select {
+  width: 52px !important;
+  min-width: 52px !important;
+  max-width: 52px !important;
+  flex: 0 0 52px !important;
+  font-size: 0.78rem !important;
+  font-weight: 600;
+  padding-left: 6px !important;
+  padding-right: 18px !important;
+  background-position: right 4px center !important;
+  text-align: center;
+}
+
+/* Card de Seleção de Loja / Marketplace - Mais espaçoso e com margens elegantes */
+.sa-loja-section-card {
+  background-color: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin-top: 6px;
+  margin-bottom: 20px;
+}
+
+/* Card de Agrupamento de Custos na Calculadora - Mais espaçoso e alinhado */
+.sa-calc-box-card {
+  background-color: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 18px;
+  margin-bottom: 20px;
+}
+
+/* Botões de abas de loja */
+#lojaTabs .btn {
+  font-size: 0.78rem;
+  padding: 5px 14px;
+  border-radius: 20px;
+  font-weight: 500;
+  transition: all 0.15s ease;
+}
+
+#lojaTabs .btn.active {
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+}
+
+/* Espaçamento elegante e consistente para ícones do Bootstrap ao lado de texto */
+i.bi:not(:only-child) {
+  margin-right: 6px;
+}
+
+.btn > i.bi:not(:only-child),
+.btn i.bi.me-1,
+.btn i.bi.me-1\.5 {
+  margin-right: 7px !important;
+}
+
+.nav-link > i.bi:not(:only-child) {
+  margin-right: 7px !important;
+}
+
+.form-label i.bi,
+label i.bi {
+  margin-right: 7px !important;
+}
+
+.badge > i.bi:not(:only-child) {
+  margin-right: 5px !important;
+}
+
+/* Estados do Semáforo de Lucratividade */
+.sa-lucro-box-danger {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(220, 38, 38, 0.05) 100%) !important;
+  border-color: #FCA5A5 !important;
+}
+
+.sa-lucro-box-danger-subtle {
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.12) 0%, rgba(234, 88, 12, 0.05) 100%) !important;
+  border-color: #FDBA74 !important;
+}
+
+.sa-lucro-box-warning {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.14) 0%, rgba(217, 119, 6, 0.05) 100%) !important;
+  border-color: #FDE68A !important;
+}
+
+.sa-lucro-box-good {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(5, 150, 105, 0.05) 100%) !important;
+  border-color: #A7F3D0 !important;
+}
+
+.sa-lucro-box-excellent {
+  background: linear-gradient(135deg, rgba(13, 148, 136, 0.16) 0%, rgba(15, 118, 110, 0.06) 100%) !important;
+  border-color: #99F6E4 !important;
+}
+
+.shadow-xs {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+/* Card Compacto Multicanal */
+.sa-mini-channel-card {
+  transition: all 0.15s ease-in-out;
+}
+.sa-mini-channel-card:hover {
+  transform: translateY(-1.5px);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08) !important;
+}
 

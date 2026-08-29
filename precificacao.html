@@ -15,7 +15,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 <link rel="icon" type="image/png" href="logo-icon.png">
-<link href="css/style.css?v=4" rel="stylesheet">
+<link href="css/style.css?v=6" rel="stylesheet">
 </head>
 <body>
 
@@ -23,11 +23,16 @@
   <div id="sidebarMount"></div>
 
   <main class="main-content">
-      <div class="d-flex justify-content-between align-items-center mb-4 page-header">
+      <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2 mb-4 page-header">
         <h1 class="h4 mb-0">Calculadora de Preços</h1>
-        <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#lojasModal">
-          <i class="bi bi-shop me-1"></i>Gerenciar lojas
-        </button>
+        <div class="d-flex flex-wrap gap-2">
+          <button class="btn btn-outline-secondary btn-sm d-flex align-items-center" id="btnAbrirConfigPadrao" data-bs-toggle="modal" data-bs-target="#configPadraoModal" title="Configurações compartilhadas entre todas as lojas">
+            <i class="bi bi-sliders text-primary me-2"></i>Configurações padrão
+          </button>
+          <button class="btn btn-outline-secondary btn-sm d-flex align-items-center" data-bs-toggle="modal" data-bs-target="#lojasModal">
+            <i class="bi bi-shop text-primary me-2"></i>Gerenciar lojas
+          </button>
+        </div>
       </div>
 
       <div class="row g-3 align-items-stretch">
@@ -38,20 +43,21 @@
               <div class="btn-group sa-calc-mode-group" role="group" aria-label="Modo de cálculo">
                 <input type="radio" class="btn-check" name="calcModoCalculo" id="calcModoMargem" value="margem" checked autocomplete="off">
                 <label class="btn btn-outline-secondary btn-sm py-1 px-3 text-nowrap d-flex align-items-center justify-content-center" for="calcModoMargem" style="font-size: 0.72rem; cursor: pointer;">
-                  <i class="bi bi-percent me-1"></i>Por Margem
+                  <i class="bi bi-percent me-2"></i>Por Margem
                 </label>
 
                 <input type="radio" class="btn-check" name="calcModoCalculo" id="calcModoPrecoAlvo" value="preco_alvo" autocomplete="off">
                 <label class="btn btn-outline-secondary btn-sm py-1 px-3 text-nowrap d-flex align-items-center justify-content-center" for="calcModoPrecoAlvo" style="font-size: 0.72rem; cursor: pointer;">
-                  <i class="bi bi-tag me-1"></i>Preço Alvo
+                  <i class="bi bi-tag me-2"></i>Preço Alvo
                 </label>
               </div>
             </div>
 
             <form id="calculadoraForm" class="d-flex flex-column flex-fill">
-              <div class="mb-2">
+              <!-- Campo: Nome do Produto -->
+              <div class="mb-3">
                 <div class="d-flex justify-content-between align-items-center mb-1">
-                  <label class="form-label small mb-0" for="calcNomeProduto">Nome do produto</label>
+                  <label class="form-label small fw-semibold text-dark mb-0" for="calcNomeProduto">Nome do produto</label>
                   <div class="btn-group" role="group" aria-label="Tipo de produto" style="width: 140px; height: 26px;">
                     <input type="radio" class="btn-check" name="calcTipoProduto" id="calcTipoUnitario" value="unitario" checked autocomplete="off">
                     <label class="btn btn-outline-secondary btn-sm py-0 text-nowrap d-flex align-items-center justify-content-center" for="calcTipoUnitario" style="font-size: 0.7rem; cursor: pointer; flex: 1;">Unitário</label>
@@ -60,98 +66,158 @@
                     <label class="btn btn-outline-secondary btn-sm py-0 text-nowrap d-flex align-items-center justify-content-center" for="calcTipoKit" style="font-size: 0.7rem; cursor: pointer; flex: 1;">Kit</label>
                   </div>
                 </div>
-                <div>
-                  <input type="text" class="form-control form-control-sm" id="calcNomeProduto" required autocomplete="off">
-                </div>
+                <input type="text" class="form-control form-control-sm" id="calcNomeProduto" placeholder="Ex: Garrafa Térmica Inox 500ml" required autocomplete="off">
                 <div class="small mt-1 d-none" id="produtoExistenteHint"></div>
               </div>
 
               <!-- Componentes do Kit (visível apenas quando Tipo = Kit) -->
-              <div id="calcKitComponentesWrapper" class="d-none border rounded p-2 mb-2" style="background-color: rgba(248, 250, 252, 0.5); border-color: var(--sa-border) !important;">
-                <div class="d-flex justify-content-between align-items-center mb-1">
+              <div id="calcKitComponentesWrapper" class="d-none border rounded p-2.5 mb-3" style="background-color: rgba(248, 250, 252, 0.6); border-color: var(--sa-border) !important;">
+                <div class="d-flex justify-content-between align-items-center mb-1.5">
                   <span class="text-muted small fw-semibold" style="font-size: 0.7rem;">Montar Kit a partir de produtos existentes:</span>
                   <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none fw-bold" id="btnAdicionarComp" style="font-size: 0.7rem; color: var(--sa-teal-dark);">+ Adicionar produto</button>
                 </div>
-                <div id="kitComponentesLista" class="d-flex flex-column gap-1">
+                <div id="kitComponentesLista" class="d-flex flex-column gap-1.5">
                   <!-- Inseridos dinamicamente por JS -->
                 </div>
-                <div class="d-flex justify-content-end align-items-center mt-2 pt-1 border-top" id="kitTotalizadorRow" style="border-top-style: dashed !important; border-top-color: var(--sa-border) !important; font-size: 0.7rem;">
+                <div class="d-flex justify-content-end align-items-center mt-2 pt-1 border-top" id="kitTotalizadorRow" style="border-top-style: dashed !important; border-top-color: var(--sa-border) !important; font-size: 0.72rem;">
                   <span class="text-muted me-1">Soma dos itens:</span>
                   <strong class="text-dark" id="kitTotalizadorValor">R$ 0,00</strong>
                 </div>
               </div>
 
-              <div class="row g-2 mb-2">
+              <!-- Links e Referência -->
+              <div class="row g-2 mb-3">
                 <div class="col-12 col-sm-4">
-                  <label class="form-label small mb-1" for="calcLinkVenda">Link de venda</label>
+                  <label class="form-label small text-muted mb-1" for="calcLinkVenda">Link de venda</label>
                   <input type="url" class="form-control form-control-sm" id="calcLinkVenda" placeholder="Seu anúncio">
                 </div>
                 <div class="col-12 col-sm-4">
-                  <label class="form-label small mb-1" for="calcLinkReferencia">Link de referência</label>
+                  <label class="form-label small text-muted mb-1" for="calcLinkReferencia">Link de referência</label>
                   <input type="url" class="form-control form-control-sm" id="calcLinkReferencia" placeholder="Concorrente / ref.">
                 </div>
                 <div class="col-12 col-sm-4">
-                  <label class="form-label small mb-1" for="calcPrecoReferencia">Preço de referência (R$)</label>
+                  <label class="form-label small text-muted mb-1" for="calcPrecoReferencia">Preço de ref. (R$)</label>
                   <input type="number" step="0.01" min="0" class="form-control form-control-sm" id="calcPrecoReferencia" placeholder="Ex: 49,90">
                 </div>
               </div>
 
-              <div class="mb-2">
-                <div class="d-flex align-items-center justify-content-between mb-1">
-                  <label class="form-label small mb-0" id="lojaTabsLabel">Loja / marketplace</label>
+              <!-- Loja / Marketplace -->
+              <div class="sa-loja-section-card">
+                <div class="d-flex align-items-center justify-content-between mb-2.5">
+                  <label class="form-label small fw-semibold text-dark mb-0 d-flex align-items-center" id="lojaTabsLabel" style="font-size: 0.8rem;">
+                    <i class="bi bi-shop text-primary me-2"></i>Loja / Marketplace
+                  </label>
                   <div class="form-check form-switch mb-0">
                     <input class="form-check-input" type="checkbox" role="switch" id="calcCompararCanais" style="cursor: pointer;">
-                    <label class="form-check-label small text-muted" for="calcCompararCanais" style="cursor: pointer;">Comparar canais</label>
+                    <label class="form-check-label small text-muted" for="calcCompararCanais" style="cursor: pointer; font-size: 0.72rem;">Comparar canais</label>
                   </div>
                 </div>
-                <div class="d-flex flex-wrap gap-2 mb-2" id="lojaTabs"></div>
+                <div class="d-flex flex-wrap gap-2 pt-1 pb-0.5" id="lojaTabs"></div>
                 <input type="hidden" id="calcLojaId" value="">
               </div>
 
-              <div class="row g-2 mb-2">
-                <div class="col-6 col-sm-4">
-                  <label class="form-label small" for="calcCustoProduto">Custo do produto (R$)</label>
-                  <input type="number" step="0.01" min="0" class="form-control form-control-sm" id="calcCustoProduto" value="0" required>
-                </div>
-                <div class="col-6 col-sm-4">
-                  <label class="form-label small" for="calcCustoEmbalagem">Embalagem (R$)</label>
-                  <input type="number" step="0.01" min="0" class="form-control form-control-sm" id="calcCustoEmbalagem" value="0.50" required>
-                </div>
-                <div class="col-12 col-sm-4">
-                  <label class="form-label small" for="calcCustoOperacional">Custo operacional (R$)</label>
-                  <input type="number" step="0.01" min="0" class="form-control form-control-sm" id="calcCustoOperacional" value="0" required>
-                </div>
-              </div>
+              <!-- Painel Unificado de Custos e Margem (Grid 3x2 Perfeitamente Alinhado e com Balões do Mesmo Tamanho) -->
+              <div class="sa-calc-box-card">
+                <!-- Linha 1: Custos Diretos -->
+                <div class="row g-2 mb-2.5">
+                  <div class="col-12 col-sm-4">
+                    <div class="d-flex justify-content-between align-items-center mb-1" style="height: 18px;">
+                      <label class="form-label small fw-semibold mb-0" for="calcCustoProduto">Custo produto (R$)</label>
+                    </div>
+                    <div class="input-group input-group-sm">
+                      <input type="number" step="0.01" min="0" class="form-control form-control-sm" id="calcCustoProduto" value="0" required>
+                      <span class="input-group-text bg-light text-muted sa-addon-fixed">R$</span>
+                    </div>
+                  </div>
 
-              <div class="row g-2 mb-3">
-                <div class="col-12 col-sm-4" id="wrapperCalcLucro">
-                  <label class="form-label small" for="calcLucro">Lucro desejado</label>
-                  <div class="input-group">
-                    <input type="number" step="0.01" min="0" class="form-control" id="calcLucro" value="30" required>
-                    <select class="form-select sa-lucro-tipo-select" id="calcLucroTipo" aria-label="Tipo do lucro: reais ou percentual">
-                      <option value="valor">R$</option>
-                      <option value="percentual" selected>%</option>
-                    </select>
+                  <div class="col-6 col-sm-4">
+                    <div class="d-flex justify-content-between align-items-center mb-1" style="height: 18px;">
+                      <label class="form-label small fw-semibold mb-0" for="calcCustoEmbalagem">Embalagem (R$)</label>
+                      <span id="restoreEmbalagemPadraoWrapper" class="d-none">
+                        <span class="sa-restore-badge" id="btnRestoreEmbalagem" title="Restaurar padrão">
+                          <i class="bi bi-arrow-counterclockwise"></i> <span id="restoreEmbalagemValorText">Padrão</span>
+                        </span>
+                      </span>
+                    </div>
+                    <div class="input-group input-group-sm">
+                      <input type="number" step="0.01" min="0" class="form-control form-control-sm" id="calcCustoEmbalagem" value="0.50" required>
+                      <button type="button" class="btn btn-outline-secondary px-0 sa-addon-fixed" id="btnAbrirModalEscolherEmbalagem" title="Escolher modelo de embalagem">
+                        <i class="bi bi-box-seam text-primary"></i>
+                      </button>
+                    </div>
+                    <div id="embalagemSelecionadaNomeBadge" class="small text-muted mt-1 d-none" style="font-size: 0.68rem;"></div>
+                  </div>
+
+                  <div class="col-6 col-sm-4">
+                    <div class="d-flex justify-content-between align-items-center mb-1" style="height: 18px;">
+                      <label class="form-label small fw-semibold mb-0" for="calcCustoOperacional">Custo oper. (R$)</label>
+                      <span id="restoreOperacionalPadraoWrapper" class="d-none">
+                        <span class="sa-restore-badge" id="btnRestoreOperacional" title="Restaurar padrão">
+                          <i class="bi bi-arrow-counterclockwise"></i> <span id="restoreOperacionalValorText">Padrão</span>
+                        </span>
+                      </span>
+                    </div>
+                    <div class="input-group input-group-sm">
+                      <input type="number" step="0.01" min="0" class="form-control form-control-sm" id="calcCustoOperacional" value="0" required>
+                      <button type="button" class="btn btn-outline-secondary px-0 sa-addon-fixed" id="btnAbrirModalRateioOp" title="Calculadora de rateio de custos operacionais">
+                        <i class="bi bi-calculator text-primary"></i>
+                      </button>
+                    </div>
                   </div>
                 </div>
-                <div class="col-12 col-sm-4 d-none" id="wrapperCalcPrecoAlvo">
-                  <label class="form-label small text-primary fw-semibold" for="calcPrecoAlvoInput">Preço de venda alvo (R$)</label>
-                  <input type="number" step="0.01" min="0" class="form-control form-control-sm border-primary" id="calcPrecoAlvoInput" placeholder="Ex: 49.90">
-                </div>
-                <div class="col-6 col-sm-4">
-                  <label class="form-label small" for="calcTaxaPercentual">Taxa da loja (%)</label>
-                  <input type="number" step="0.01" min="0" max="99.99" class="form-control form-control-sm" id="calcTaxaPercentual" value="0">
-                </div>
-                <div class="col-6 col-sm-4">
-                  <label class="form-label small" for="calcTaxaFixa">Taxa fixa da loja (R$)</label>
-                  <input type="number" step="0.01" min="0" class="form-control form-control-sm" id="calcTaxaFixa" value="0">
+
+                <!-- Linha 2: Margem de Lucro e Taxas -->
+                <div class="row g-2">
+                  <div class="col-12 col-sm-4" id="wrapperCalcLucro">
+                    <div class="d-flex justify-content-between align-items-center mb-1" style="height: 18px;">
+                      <label class="form-label small fw-semibold mb-0" for="calcLucro">Lucro desejado</label>
+                    </div>
+                    <div class="input-group input-group-sm">
+                      <input type="number" step="0.01" min="0" class="form-control form-control-sm" id="calcLucro" value="30" required>
+                      <select class="form-select form-select-sm sa-lucro-tipo-select" id="calcLucroTipo" aria-label="Tipo do lucro: reais ou percentual">
+                        <option value="valor">R$</option>
+                        <option value="percentual" selected>%</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div class="col-12 col-sm-4 d-none" id="wrapperCalcPrecoAlvo">
+                    <div class="d-flex justify-content-between align-items-center mb-1" style="height: 18px;">
+                      <label class="form-label small text-primary fw-semibold mb-0" for="calcPrecoAlvoInput">Preço alvo (R$)</label>
+                    </div>
+                    <div class="input-group input-group-sm">
+                      <input type="number" step="0.01" min="0" class="form-control form-control-sm border-primary" id="calcPrecoAlvoInput" placeholder="Ex: 49,90">
+                      <span class="input-group-text bg-primary bg-opacity-10 text-primary border-primary sa-addon-fixed">R$</span>
+                    </div>
+                  </div>
+
+                  <div class="col-6 col-sm-4">
+                    <div class="d-flex justify-content-between align-items-center mb-1" style="height: 18px;">
+                      <label class="form-label small fw-semibold mb-0" for="calcTaxaPercentual">Taxa da loja (%)</label>
+                    </div>
+                    <div class="input-group input-group-sm">
+                      <input type="number" step="0.01" min="0" max="99.99" class="form-control form-control-sm" id="calcTaxaPercentual" value="0">
+                      <span class="input-group-text bg-light text-muted sa-addon-fixed">%</span>
+                    </div>
+                  </div>
+
+                  <div class="col-6 col-sm-4">
+                    <div class="d-flex justify-content-between align-items-center mb-1" style="height: 18px;">
+                      <label class="form-label small fw-semibold mb-0" for="calcTaxaFixa">Taxa fixa (R$)</label>
+                    </div>
+                    <div class="input-group input-group-sm">
+                      <input type="number" step="0.01" min="0" class="form-control form-control-sm" id="calcTaxaFixa" value="0">
+                      <span class="input-group-text bg-light text-muted sa-addon-fixed">R$</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
+              <!-- Regras Automáticas e Promoções -->
               <div class="mb-3">
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" id="calcAutoAjustarTaxa" checked>
-                  <label class="form-check-label small text-muted" for="calcAutoAjustarTaxa">
+                  <label class="form-check-label small text-muted" for="calcAutoAjustarTaxa" style="cursor: pointer; font-size: 0.75rem;">
                     Ajustar taxas automaticamente pelas faixas de preço
                   </label>
                 </div>
@@ -160,7 +226,7 @@
                 <div id="amazonPlanoWrapper" class="d-none p-2 mt-2 rounded border" style="background-color: rgba(240, 247, 255, 0.7); border-color: #BFDBFE !important;">
                   <div class="d-flex justify-content-between align-items-center mb-1.5">
                     <span class="small fw-semibold text-dark" style="font-size: 0.75rem;">
-                      <i class="bi bi-shield-check text-primary me-1"></i>Seu Plano na Amazon:
+                      <i class="bi bi-shield-check text-primary me-2"></i>Seu Plano na Amazon:
                     </span>
                     <span class="badge bg-primary text-white" style="font-size: 0.65rem;" id="amazonPlanoStatusBadge">Salvo na sua conta</span>
                   </div>
@@ -184,31 +250,33 @@
                 </div>
               </div>
 
-              <div class="mb-3 border-top pt-2">
+              <!-- Promoção -->
+              <div class="mb-3 border-top pt-2.5">
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" id="calcSimularPromo">
-                  <label class="form-check-label small text-muted fw-semibold" for="calcSimularPromo" style="cursor: pointer;">
+                  <label class="form-check-label small text-muted fw-semibold" for="calcSimularPromo" style="cursor: pointer; font-size: 0.75rem;">
                     Simular preço promocional (Campanha / Desconto)
                   </label>
                 </div>
-                <div id="calcPromoFields" class="row g-2 mt-1 d-none">
+                <div id="calcPromoFields" class="row g-2 mt-1.5 d-none">
                   <div class="col-6">
-                    <label class="form-label small mb-1" for="calcPromoDesconto">Desconto (%)</label>
+                    <label class="form-label small text-muted mb-1" for="calcPromoDesconto">Desconto (%)</label>
                     <input type="number" step="0.1" min="0" max="100" class="form-control form-control-sm" id="calcPromoDesconto" placeholder="Ex: 10">
                   </div>
                   <div class="col-6">
-                    <label class="form-label small mb-1" for="calcPromoPreco">Ou Preço Promocional (R$)</label>
+                    <label class="form-label small text-muted mb-1" for="calcPromoPreco">Ou Preço Promocional (R$)</label>
                     <input type="number" step="0.01" min="0" class="form-control form-control-sm" id="calcPromoPreco" placeholder="Ex: 48,00">
                   </div>
                 </div>
               </div>
 
-              <div class="d-flex gap-2 mt-auto pt-3">
-                <button type="submit" class="btn btn-primary btn-sm flex-fill">
-                  <i class="bi bi-calculator me-1"></i>Calcular
+              <!-- Botões de Ação -->
+              <div class="d-flex gap-2 mt-auto pt-3 border-top">
+                <button type="submit" class="btn btn-primary btn-sm flex-fill py-2 fw-semibold">
+                  <i class="bi bi-calculator me-2"></i>Calcular preço
                 </button>
-                <button type="button" class="btn btn-outline-secondary btn-sm" id="salvarCalculoBtn" disabled>
-                  <i class="bi bi-save me-1"></i>Salvar no histórico
+                <button type="button" class="btn btn-outline-secondary btn-sm py-2 px-3" id="salvarCalculoBtn" disabled title="Atalho: Ctrl + S">
+                  <i class="bi bi-save me-2"></i>Salvar no histórico <kbd class="ms-1.5 bg-light text-muted border px-1 py-0.5 rounded" style="font-size: 0.65rem;">Ctrl+S</kbd>
                 </button>
               </div>
             </form>
@@ -217,24 +285,20 @@
 
         <div class="col-12 col-lg-6 d-flex flex-column" id="resultadoCard">
           <div class="card-sa flex-fill">
-            <h2 class="h6 mb-2">Resultado</h2>
+            <div class="d-flex justify-content-between align-items-center mb-2.5 pb-1 border-bottom">
+              <h2 class="h6 mb-0 text-dark fw-bold">Resultado Detalhado</h2>
+              <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 fw-semibold" id="resultadoLojaAtivaBadge" style="font-size: 0.72rem;">Canal Ativo</span>
+            </div>
 
-            <!-- Comparativo de múltiplos canais -->
-            <div id="resultadoMultiploWrapper" class="mb-3 d-none">
-              <span class="text-muted small fw-semibold mb-2 d-block">Comparativo dos Canais Selecionados:</span>
-              <div class="table-responsive border rounded p-1 mb-2 bg-light bg-opacity-10">
-                <table class="table table-sm table-sa mb-0" style="font-size: 0.8rem;">
-                  <thead>
-                    <tr>
-                      <th>Loja</th>
-                      <th class="text-end">Preço Sugerido</th>
-                      <th class="text-end">Lucro R$</th>
-                      <th class="text-end">Recebe Líquido</th>
-                    </tr>
-                  </thead>
-                  <tbody id="resultadoMultiploTableBody"></tbody>
-                </table>
+            <!-- Comparativo de múltiplos canais com cards compactos -->
+            <div id="resultadoMultiploWrapper" class="mb-3 d-none p-2.5 bg-light bg-opacity-40 border rounded-3">
+              <div class="d-flex justify-content-between align-items-center mb-2 pb-1 border-bottom">
+                <span class="small fw-bold text-dark d-flex align-items-center" style="font-size: 0.78rem;">
+                  <i class="bi bi-diagram-3 text-primary me-1.5"></i>Comparativo Multicanal
+                </span>
+                <span class="badge bg-white text-secondary border shadow-xs" id="multiploQtdCanaisBadge" style="font-size: 0.65rem;"></span>
               </div>
+              <div class="row g-2" id="resultadoMultiploCardsContainer"></div>
             </div>
 
             <table class="table table-sa table-resultado mb-0">
@@ -273,6 +337,10 @@
                 <div class="d-flex justify-content-between align-items-center">
                   <span class="sa-resumo-label">Lucro líquido</span>
                   <span class="sa-resumo-value" id="resLucro">—</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top border-dark border-opacity-10 d-none" id="resMargemStatusWrapper">
+                  <span class="small opacity-75" style="font-size: 0.72rem;">Diagnóstico de margem:</span>
+                  <span id="resMargemStatusBadge"></span>
                 </div>
               </div>
             </div>
@@ -332,8 +400,8 @@
               </div>
             </div>
 
-            <div id="comparacaoPrecoWrapper" class="mt-3 p-3 rounded" style="background-color: var(--sa-bg); border: 1px solid var(--sa-border); min-height: 100px;">
-              <div class="text-center text-muted py-2 small">
+            <div id="comparacaoPrecoWrapper" class="mt-2 p-2 rounded" style="background-color: var(--sa-bg); border: 1px solid var(--sa-border); min-height: 40px;">
+              <div class="text-center text-muted py-1 small" style="font-size: 0.72rem;">
                 <i class="bi bi-info-circle me-1"></i> Preencha o "Preço de referência" para comparar a competitividade do seu preço sugerido.
               </div>
             </div>
@@ -405,7 +473,7 @@
 
 <!-- Modal de gerenciamento de lojas -->
 <div class="modal fade" id="lojasModal" tabindex="-1">
-  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header d-flex justify-content-between align-items-center">
         <div class="d-flex align-items-center gap-2">
@@ -424,76 +492,99 @@
           </button>
         </div>
 
-        <div class="table-responsive mb-4">
-          <table class="table table-sa table-sm table-stack-mobile">
-            <thead>
+        <div class="table-responsive mb-4 border rounded overflow-hidden">
+          <table class="table table-sa table-sm table-stack-mobile align-middle mb-0">
+            <thead class="bg-light">
               <tr>
-                <th>Nome</th>
-                <th>Taxa %</th>
-                <th>Taxa fixa (R$)</th>
+                <th style="min-width: 140px;">Loja</th>
+                <th style="min-width: 130px;">Taxas</th>
+                <th style="min-width: 170px;">Custos padrão</th>
                 <th>Observações</th>
-                <th>Atualizado em</th>
-                <th class="text-end">Ações</th>
+                <th style="min-width: 110px;">Atualizado em</th>
+                <th style="min-width: 80px;" class="text-end">Ações</th>
               </tr>
             </thead>
             <tbody id="lojasTableBody"></tbody>
           </table>
         </div>
 
-        <div class="border-top pt-3">
-          <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center mb-2 gap-1">
-            <h3 class="h6 mb-0" id="lojaFormTitulo">Adicionar loja</h3>
-            <span class="text-muted small" style="font-size: 0.72rem;">Clique em um modelo para preencher rapidamente:</span>
+        <div class="card border rounded p-3 bg-light bg-opacity-50">
+          <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center mb-2.5 gap-2">
+            <div class="d-flex align-items-center gap-2">
+              <i class="bi bi-sliders text-primary"></i>
+              <h3 class="h6 mb-0 fw-bold" id="lojaFormTitulo">Adicionar loja</h3>
+            </div>
+            <span class="text-muted small" style="font-size: 0.72rem;">Modelos rápidos para preenchimento:</span>
           </div>
 
           <!-- Modelos Rápidos -->
-          <div class="d-flex flex-wrap gap-1 mb-3" id="lojaModelosRapidos">
-            <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" style="font-size: 0.72rem;" data-loja-preset="shopee">
-              <span class="fw-semibold">Shopee:</span> 20% + R$ 4,00
+          <div class="d-flex flex-wrap gap-1.5 mb-3" id="lojaModelosRapidos">
+            <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2.5 rounded-pill" style="font-size: 0.73rem;" data-loja-preset="shopee">
+              <span class="fw-bold">Shopee:</span> 20% + R$ 4,00
             </button>
-            <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" style="font-size: 0.72rem;" data-loja-preset="ml_classico">
-              <span class="fw-semibold">Mercado Livre Clássico:</span> 12% + R$ 6,00
+            <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2.5 rounded-pill" style="font-size: 0.73rem;" data-loja-preset="ml_classico">
+              <span class="fw-bold">ML Clássico:</span> 12% + R$ 6,00
             </button>
-            <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" style="font-size: 0.72rem;" data-loja-preset="ml_premium">
-              <span class="fw-semibold">Mercado Livre Premium:</span> 16,5% + R$ 6,00
+            <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2.5 rounded-pill" style="font-size: 0.73rem;" data-loja-preset="ml_premium">
+              <span class="fw-bold">ML Premium:</span> 16,5% + R$ 6,00
             </button>
-            <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" style="font-size: 0.72rem;" data-loja-preset="amazon">
-              <span class="fw-semibold">Amazon:</span> 15% + R$ 0,00 (8% até R$30)
+            <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2.5 rounded-pill" style="font-size: 0.73rem;" data-loja-preset="amazon">
+              <span class="fw-bold">Amazon:</span> 15% + R$ 0,00
             </button>
-            <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" style="font-size: 0.72rem;" data-loja-preset="tiktok">
-              <span class="fw-semibold">TikTok Shop:</span> 12% + R$ 6,00
+            <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2.5 rounded-pill" style="font-size: 0.73rem;" data-loja-preset="tiktok">
+              <span class="fw-bold">TikTok Shop:</span> 12% + R$ 6,00
             </button>
           </div>
 
           <form id="novaLojaForm">
             <input type="hidden" id="lojaEditId" value="">
-            <div class="row g-2">
-              <div class="col-12 col-sm-4">
-                <label class="form-label small" for="lojaNome">Nome</label>
+            
+            <div class="row g-2 mb-2">
+              <div class="col-12 col-md-4">
+                <label class="form-label small fw-semibold mb-1" for="lojaNome">Nome da loja / marketplace</label>
                 <input type="text" class="form-control form-control-sm" id="lojaNome" placeholder="Ex: Amazon" required>
               </div>
-              <div class="col-6 col-sm-2">
-                <label class="form-label small" for="lojaTaxaPercentual">Taxa %</label>
+              <div class="col-6 col-md-2">
+                <label class="form-label small fw-semibold mb-1" for="lojaTaxaPercentual">Comissão (%)</label>
                 <input type="number" step="0.01" min="0" max="99.99" class="form-control form-control-sm" id="lojaTaxaPercentual" value="0" required>
               </div>
-              <div class="col-6 col-sm-2">
-                <label class="form-label small" for="lojaTaxaFixa">Taxa fixa (R$)</label>
+              <div class="col-6 col-md-2">
+                <label class="form-label small fw-semibold mb-1" for="lojaTaxaFixa">Taxa fixa (R$)</label>
                 <input type="number" step="0.01" min="0" class="form-control form-control-sm" id="lojaTaxaFixa" value="0" required>
               </div>
-              <div class="col-12 col-sm-4">
-                <label class="form-label small" for="lojaLinkReferencia">Link de referência (opcional)</label>
-                <input type="url" class="form-control form-control-sm" id="lojaLinkReferencia" placeholder="Página de taxas da loja">
+              <div class="col-6 col-md-2">
+                <label class="form-label small fw-semibold mb-1" for="lojaEmbalagemPadrao">Embalagem padrão (R$)</label>
+                <input type="number" step="0.01" min="0" class="form-control form-control-sm" id="lojaEmbalagemPadrao" value="0" placeholder="0,00">
               </div>
-              <div class="col-12">
-                <label class="form-label small" for="lojaObservacoes">Observações (opcional)</label>
+              <div class="col-6 col-md-2">
+                <label class="form-label small fw-semibold mb-1" for="lojaCustoOperacionalPadrao">Custo oper. padrão (R$)</label>
+                <input type="number" step="0.01" min="0" class="form-control form-control-sm" id="lojaCustoOperacionalPadrao" value="0" placeholder="0,00">
+              </div>
+            </div>
+
+            <div class="row g-2 mb-2">
+              <div class="col-12 col-md-6">
+                <label class="form-label small fw-semibold mb-1" for="lojaLinkReferencia">Link de referência oficial (opcional)</label>
+                <input type="url" class="form-control form-control-sm" id="lojaLinkReferencia" placeholder="https://seller.exemplo.com/taxas">
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label small fw-semibold mb-1" for="lojaObservacoes">Observações e regras da categoria (opcional)</label>
                 <input type="text" class="form-control form-control-sm" id="lojaObservacoes" placeholder="Ex: comissão da categoria, regras de frete e custos fixos">
               </div>
             </div>
-            <div class="d-flex gap-2 mt-3">
-              <button type="submit" class="btn btn-primary btn-sm" id="lojaSubmitBtn">
+
+            <div class="p-2 rounded bg-white border small text-muted d-flex align-items-center gap-2 mb-3" style="font-size: 0.73rem;">
+              <i class="bi bi-info-circle text-primary flex-shrink-0"></i>
+              <span>Os valores de <strong>Embalagem padrão</strong> e <strong>Custo operacional padrão</strong> serão carregados automaticamente ao selecionar a loja na calculadora, mas você pode alterá-los a qualquer momento em cada produto.</span>
+            </div>
+
+            <div class="d-flex gap-2">
+              <button type="submit" class="btn btn-primary btn-sm px-3" id="lojaSubmitBtn">
                 <i class="bi bi-plus-lg me-1"></i>Adicionar loja
               </button>
-              <button type="button" class="btn btn-outline-secondary btn-sm d-none" id="lojaCancelEditBtn">Cancelar edição</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm px-3 d-none" id="lojaCancelEditBtn">
+                <i class="bi bi-x me-1"></i>Cancelar edição
+              </button>
             </div>
           </form>
         </div>
@@ -571,11 +662,211 @@
   </div>
 </div>
 
+<!-- Modal de Seleção de Embalagem -->
+<div class="modal fade" id="selecionarEmbalagemModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header py-2.5 d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-2">
+          <div class="rounded-circle p-1.5 bg-primary bg-opacity-10 text-primary d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+            <i class="bi bi-box-seam"></i>
+          </div>
+          <div>
+            <h2 class="h6 modal-title mb-0 fw-bold">Escolher Tipo de Embalagem</h2>
+            <span class="text-muted small" style="font-size: 0.72rem;">Selecione o modelo utilizado para este produto:</span>
+          </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-2.5" id="embalagensModalCardsContainer">
+          <!-- Cards de embalagem inseridos dinamicamente -->
+        </div>
+      </div>
+      <div class="modal-footer py-2 d-flex justify-content-between align-items-center">
+        <button type="button" class="btn btn-link btn-sm text-decoration-none text-muted p-0" id="btnIrParaConfigEmbalagens" style="font-size: 0.75rem;">
+          <i class="bi bi-gear me-1"></i>Gerenciar modelos de embalagem
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Fechar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de Configurações Padrão (Compartilhadas) com Abas -->
+<div class="modal fade" id="configPadraoModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header py-2.5 d-flex justify-content-between align-items-center border-bottom-0 pb-0">
+        <div class="d-flex align-items-center gap-2">
+          <div class="rounded-circle p-1.5 bg-primary bg-opacity-10 text-primary d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+            <i class="bi bi-sliders"></i>
+          </div>
+          <div>
+            <h2 class="h6 modal-title mb-0 fw-bold">Configurações & Parâmetros Padrão</h2>
+            <span class="text-muted small" style="font-size: 0.72rem;">Valores compartilhados e ferramentas de rateio para todas as lojas</span>
+          </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+
+      <div class="modal-body pt-2">
+        <!-- Abas de navegação -->
+        <ul class="nav nav-tabs mb-3" id="configPadraoTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active fw-semibold" id="tab-padroes-btn" data-bs-toggle="tab" data-bs-target="#tab-padroes-pane" type="button" role="tab" style="font-size: 0.8rem;">
+              <i class="bi bi-sliders me-2 text-primary"></i>Padrões & Embalagens
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link fw-semibold" id="tab-rateio-btn" data-bs-toggle="tab" data-bs-target="#tab-rateio-pane" type="button" role="tab" style="font-size: 0.8rem;">
+              <i class="bi bi-calculator me-2 text-primary"></i>Rateio de Custos Fixos
+            </button>
+          </li>
+        </ul>
+
+        <!-- Conteúdo das Abas -->
+        <div class="tab-content" id="configPadraoTabsContent">
+          
+          <!-- Aba 1: Padrões e Embalagens -->
+          <div class="tab-pane fade show active" id="tab-padroes-pane" role="tabpanel" tabindex="0">
+            <!-- Valores Padrão Globais -->
+            <div class="card p-3 mb-3 bg-light bg-opacity-50 border rounded-3">
+              <h3 class="h6 fw-bold mb-1 text-dark d-flex align-items-center gap-1.5" style="font-size: 0.82rem;">
+                <i class="bi bi-globe text-primary"></i>Valores Padrão Globais
+              </h3>
+              <p class="small text-muted mb-2.5" style="font-size: 0.72rem;">
+                Esses valores iniciam automaticamente na calculadora quando nenhum valor específico da loja for configurado.
+              </p>
+              <div class="row g-2">
+                <div class="col-12 col-sm-4">
+                  <label class="form-label small fw-semibold mb-1" for="cfgGlobalEmbalagem">Embalagem padrão (R$)</label>
+                  <input type="number" step="0.01" min="0" class="form-control form-control-sm" id="cfgGlobalEmbalagem" value="0.50">
+                </div>
+                <div class="col-12 col-sm-4">
+                  <label class="form-label small fw-semibold mb-1" for="cfgGlobalOperacional">Custo operacional padrão (R$)</label>
+                  <input type="number" step="0.01" min="0" class="form-control form-control-sm" id="cfgGlobalOperacional" value="0.00">
+                </div>
+                <div class="col-12 col-sm-4">
+                  <label class="form-label small fw-semibold mb-1" for="cfgGlobalLucro">Lucro desejado padrão (%)</label>
+                  <div class="input-group input-group-sm">
+                    <input type="number" step="0.01" min="0" class="form-control" id="cfgGlobalLucro" value="30">
+                    <span class="input-group-text">%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Catálogo de Modelos de Embalagem -->
+            <div class="card p-3 border rounded-3">
+              <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center mb-2.5 gap-2">
+                <div>
+                  <h3 class="h6 fw-bold mb-0 text-dark d-flex align-items-center gap-1.5" style="font-size: 0.82rem;">
+                    <i class="bi bi-boxes text-primary"></i>Catálogo de Tipos de Embalagem
+                  </h3>
+                  <span class="text-muted small" style="font-size: 0.72rem;">Cadastre as caixas, sacos e envelopes usados pela sua operação:</span>
+                </div>
+              </div>
+
+              <div class="table-responsive border rounded mb-3">
+                <table class="table table-sa table-sm align-middle mb-0" style="font-size: 0.78rem;">
+                  <thead class="bg-light">
+                    <tr>
+                      <th>Nome do Modelo</th>
+                      <th>Dimensões / Detalhes</th>
+                      <th class="text-end">Custo Unitário (R$)</th>
+                      <th class="text-end" style="width: 140px;">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody id="embalagensConfigTableBody"></tbody>
+                </table>
+              </div>
+
+              <!-- Formulário para adicionar nova embalagem -->
+              <div class="p-2.5 rounded bg-light border">
+                <span class="small fw-semibold text-dark d-block mb-1.5" style="font-size: 0.75rem;">+ Adicionar novo tipo de embalagem:</span>
+                <div class="row g-2">
+                  <div class="col-12 col-sm-4">
+                    <input type="text" class="form-control form-control-sm" id="novaEmbNome" placeholder="Ex: Caixa G">
+                  </div>
+                  <div class="col-12 col-sm-4">
+                    <input type="text" class="form-control form-control-sm" id="novaEmbDesc" placeholder="Ex: 35x25x15 cm">
+                  </div>
+                  <div class="col-8 col-sm-2">
+                    <input type="number" step="0.01" min="0" class="form-control form-control-sm" id="novaEmbCusto" placeholder="R$ 0,00">
+                  </div>
+                  <div class="col-4 col-sm-2">
+                    <button type="button" class="btn btn-primary btn-sm w-100" id="btnAdicionarTipoEmbalagem">
+                      <i class="bi bi-plus-lg me-0.5"></i>Adicionar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Aba 2: Rateio de Custos Fixos -->
+          <div class="tab-pane fade" id="tab-rateio-pane" role="tabpanel" tabindex="0">
+            <div class="card p-3 border rounded-3 bg-light bg-opacity-50 mb-3">
+              <h3 class="h6 fw-bold mb-1 text-dark d-flex align-items-center gap-1.5" style="font-size: 0.82rem;">
+                <i class="bi bi-calculator text-primary"></i>Calculadora de Rateio de Despesas Fixas
+              </h3>
+              <p class="small text-muted mb-3" style="font-size: 0.76rem; line-height: 1.4;">
+                Rateie suas despesas operacionais fixas mensais (mensalidades de marketplaces, ERP, fita adesiva, etiquetas térmicas, internet, etc.) pelo volume estimado de pedidos por mês para encontrar o custo fixo por pacote.
+              </p>
+
+              <div class="row g-2 mb-3">
+                <div class="col-12 col-sm-6">
+                  <label class="form-label small fw-semibold" for="rateioTotalDespesas">Total de despesas fixas mensais (R$)</label>
+                  <div class="input-group input-group-sm">
+                    <span class="input-group-text">R$</span>
+                    <input type="number" step="0.01" min="0" class="form-control" id="rateioTotalDespesas" placeholder="Ex: 300,00" value="300">
+                  </div>
+                  <div class="form-text text-muted" style="font-size: 0.68rem;">Ex: Amazon Pro R$19 + ERP R$80 + Etiquetas R$100 + Diversos R$100 = R$ 299,00</div>
+                </div>
+
+                <div class="col-12 col-sm-6">
+                  <label class="form-label small fw-semibold" for="rateioQtdPedidos">Média estimada de pedidos por mês</label>
+                  <input type="number" step="1" min="1" class="form-control form-control-sm" id="rateioQtdPedidos" placeholder="Ex: 150" value="150">
+                  <div class="form-text text-muted" style="font-size: 0.68rem;">Quantidade total de pacotes expedidos no mês</div>
+                </div>
+              </div>
+
+              <div class="p-3 rounded-3 bg-white border text-center my-1">
+                <div class="small text-muted mb-1" style="font-size: 0.75rem;">Custo operacional unitário sugerido:</div>
+                <div class="h3 mb-0 text-primary fw-bold" id="rateioResultadoUnitario">R$ 2,00</div>
+                <div class="small text-muted mt-1" style="font-size: 0.7rem;">por cada unidade vendida</div>
+              </div>
+            </div>
+
+            <div class="d-flex flex-wrap justify-content-end gap-2">
+              <button type="button" class="btn btn-sm btn-outline-primary" id="btnCopiarRateioParaPadrao">
+                <i class="bi bi-arrow-left-circle me-1"></i>Definir como Custo Operacional Padrão
+              </button>
+              <button type="button" class="btn btn-sm btn-primary" id="btnAplicarRateioCalculadora">
+                <i class="bi bi-check2-circle me-1"></i>Aplicar agora na calculadora
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="modal-footer py-2 d-flex justify-content-between align-items-center">
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Fechar</button>
+        <button type="button" class="btn btn-sm btn-primary px-3" id="btnSalvarConfigPadrao">
+          <i class="bi bi-check2-circle me-1"></i>Salvar configurações padrão
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/common.js?v=2"></script>
 <script src="js/supabaseClient.js"></script>
 <script src="js/page-helpers.js"></script>
-<script src="js/precificacao.js?v=12"></script>
+<script src="js/precificacao.js?v=26"></script>
 </body>
 </html>

@@ -369,10 +369,16 @@ create table if not exists lojas_ecommerce (
   nome text not null,
   taxa_percentual numeric(5,2) not null default 0 check (taxa_percentual >= 0 and taxa_percentual < 100),
   taxa_fixa numeric(10,2) not null default 0 check (taxa_fixa >= 0),
+  embalagem_padrao numeric(10,2) not null default 0 check (embalagem_padrao >= 0),
+  custo_operacional_padrao numeric(10,2) not null default 0 check (custo_operacional_padrao >= 0),
   link_referencia text,
   observacoes text,
   created_at timestamptz default now()
 );
+
+-- Garante as colunas mesmo se a tabela já existia de uma versão anterior
+alter table lojas_ecommerce add column if not exists embalagem_padrao numeric(10,2) not null default 0;
+alter table lojas_ecommerce add column if not exists custo_operacional_padrao numeric(10,2) not null default 0;
 
 -- Guarda quando a taxa foi revisada pela última vez, para a calculadora
 -- avisar quando uma loja está com a taxa há muito tempo sem revisão (os
@@ -497,15 +503,15 @@ begin
     raise exception 'Você não pertence a essa empresa.';
   end if;
 
-  insert into lojas_ecommerce (empresa_id, nome, taxa_percentual, taxa_fixa, observacoes)
+  insert into lojas_ecommerce (empresa_id, nome, taxa_percentual, taxa_fixa, embalagem_padrao, custo_operacional_padrao, observacoes)
   values
-    (p_empresa_id, 'Shopee', 20, 4,
+    (p_empresa_id, 'Shopee', 20, 4, 0.50, 0,
      'Taxa por faixa de preço (com Programa de Frete Grátis): até R$79,99 = 20%+R$4; R$80–99,99 = 14%+R$16; R$100–199,99 = 14%+R$20; acima de R$200 = 14%+R$26. Ajuste conforme o valor do produto.'),
-    (p_empresa_id, 'TikTok Shop', 12, 6,
+    (p_empresa_id, 'TikTok Shop', 12, 6, 0.50, 0,
      'Taxa por faixa de preço: até R$49,99 = 10%+R$4,00 (ou 16% frete grátis); a partir de R$50,00 = 12%+R$6,00. Valores já incluem o programa de frete grátis.'),
-    (p_empresa_id, 'Mercado Livre', 12, 6,
+    (p_empresa_id, 'Mercado Livre', 12, 6, 0.50, 0,
      'Utilidades Domésticas: Clássico (12%+R$6 até R$78,99; 12%+R$0 a partir de R$79). Premium (16,5%+R$6 até R$78,99; 16,5%+R$0 a partir de R$79).'),
-    (p_empresa_id, 'Amazon', 12, 0,
+    (p_empresa_id, 'Amazon', 12, 0, 0.50, 0,
      'Casa, Cozinha e Utilidades Domésticas: 12% de comissão (tarifa mínima R$1,00). Plano Profissional: R$0 taxa fixa por item. Plano Individual: R$2,00 por item.')
   on conflict (empresa_id, lower(nome)) do nothing;
 end;
