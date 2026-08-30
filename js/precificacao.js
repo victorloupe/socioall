@@ -1968,42 +1968,67 @@ function atualizarResultado(faixaForcada) {
         icon = "bi-box-seam-fill"; 
       }
 
+      const badgesBottom = [];
+      if (isBest) {
+        badgesBottom.push(`
+          <span class="badge bg-warning bg-opacity-15 text-warning-emphasis border border-warning border-opacity-30 rounded-pill px-2 py-0.5 fw-medium d-inline-flex align-items-center gap-1" style="font-size: 0.62rem; line-height: 1.2;">
+            <i class="bi bi-trophy-fill text-warning" style="font-size: 0.58rem;"></i>Maior Margem
+          </span>
+        `);
+      }
+      if (isAtivoAtual) {
+        badgesBottom.push(`
+          <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill px-2 py-0.5 fw-medium d-inline-flex align-items-center gap-1" style="font-size: 0.62rem; line-height: 1.2;">
+            <i class="bi bi-check2-circle text-primary" style="font-size: 0.60rem;"></i>Canal Ativo
+          </span>
+        `);
+      }
+
+      const badgesBottomHtml = badgesBottom.length > 0 ? `
+        <div class="d-flex align-items-center gap-1.5 pt-1.5 mt-1 border-top border-dark border-opacity-10">
+          ${badgesBottom.join("")}
+        </div>
+      ` : "";
+
       col.innerHTML = `
-        <div class="card p-2 h-100 border rounded-3 sa-mini-channel-card ${isAtivoAtual ? 'border-primary bg-primary bg-opacity-10 shadow-xs' : 'bg-white'}" 
+        <div class="card p-2.5 h-100 border rounded-3 sa-mini-channel-card d-flex flex-column justify-content-between ${isAtivoAtual ? 'border-primary bg-primary bg-opacity-10 shadow-xs' : 'bg-white'}" 
              style="border-left: 3.5px solid ${borderBrand} !important; cursor: pointer;"
              onclick="selecionarCanalUnico('${c.id}')"
              title="${isAtivoAtual ? 'Canal ativo na calculadora' : 'Clique para focar a calculadora neste canal'}">
           
-          <!-- Linha Superior: Ícone + Nome + Tag Maior Margem/Ativo + Preço Sugerido com Botão de Copiar -->
-          <div class="d-flex justify-content-between align-items-center mb-1">
-            <div class="d-flex align-items-center gap-1.5 text-truncate pe-1">
-              <i class="bi ${icon}" style="color: ${borderBrand}; font-size: 0.82rem;"></i>
-              <strong class="text-dark text-truncate" style="font-size: 0.78rem;">${escapeHtml(c.nomeLoja)}</strong>
-              ${isBest ? '<span class="badge bg-warning text-dark border py-0.5 px-1 fw-bold" style="font-size: 0.58rem;"><i class="bi bi-trophy-fill text-warning me-0.5"></i>Maior Margem</span>' : ''}
-              ${isAtivoAtual ? '<span class="badge bg-primary text-white py-0.5 px-1 fw-semibold" style="font-size: 0.58rem;">Ativo</span>' : ''}
+          <div>
+            <!-- Linha Superior: Ícone + Nome da Loja + Preço Sugerido com Botão de Copiar -->
+            <div class="d-flex justify-content-between align-items-center mb-1.5">
+              <div class="d-flex align-items-center gap-1.5 text-truncate pe-1">
+                <i class="bi ${icon}" style="color: ${borderBrand}; font-size: 0.85rem;"></i>
+                <strong class="text-dark text-truncate" style="font-size: 0.82rem;">${escapeHtml(c.nomeLoja)}</strong>
+              </div>
+              <div class="d-flex align-items-center gap-1 text-nowrap">
+                <span class="h6 mb-0 fw-bold text-dark" style="font-size: 0.95rem;">${formatCurrency(c.precoVenda)}</span>
+                <button type="button" class="btn btn-sm btn-link p-0 text-muted sa-copy-btn" title="Copiar preço deste canal" onclick="copiarPrecoCanal(${c.precoVenda}, this, event)" style="font-size: 0.8rem; line-height: 1;" aria-label="Copiar preço">
+                  <i class="bi bi-clipboard"></i>
+                </button>
+              </div>
             </div>
-            <div class="d-flex align-items-center gap-1 text-nowrap">
-              <span class="h6 mb-0 fw-bold text-dark" style="font-size: 0.95rem;">${formatCurrency(c.precoVenda)}</span>
-              <button type="button" class="btn btn-sm btn-link p-0 text-muted sa-copy-btn" title="Copiar preço deste canal" onclick="copiarPrecoCanal(${c.precoVenda}, this, event)" style="font-size: 0.8rem; line-height: 1;" aria-label="Copiar preço">
-                <i class="bi bi-clipboard"></i>
-              </button>
+
+            <!-- Linha Intermediária: Lucro Líquido + Repasse + Taxas -->
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-1 pt-1.5 border-top border-dark border-opacity-10" style="font-size: 0.70rem;">
+              <div>
+                <span class="text-muted">Lucro:</span>
+                <strong class="${c.lucro < 0 ? 'text-danger' : 'text-success'} ms-0.5">${formatCurrency(c.lucro)} <span class="fw-normal text-muted">(${c.margem.toFixed(1)}%)</span></strong>
+              </div>
+              <div class="text-nowrap">
+                <span class="text-muted">Repasse:</span>
+                <strong class="text-dark ms-0.5">${formatCurrency(c.liquido)}</strong>
+              </div>
+              <div class="text-nowrap text-muted" style="font-size: 0.65rem;">
+                Taxas: ${formatCurrency((c.valorTaxaPercentual || 0) + (c.taxaFixa || 0))}
+              </div>
             </div>
           </div>
 
-          <!-- Linha Inferior: Lucro Líquido + Repasse + Taxas -->
-          <div class="d-flex justify-content-between align-items-center pt-1 border-top border-dark border-opacity-10" style="font-size: 0.69rem;">
-            <div>
-              <span class="text-muted">Lucro: </span>
-              <strong class="${c.lucro < 0 ? 'text-danger' : 'text-success'}">${formatCurrency(c.lucro)} <span class="fw-normal">(${c.margem.toFixed(1)}%)</span></strong>
-            </div>
-            <div class="text-nowrap">
-              <span class="text-muted">Repasse: </span>
-              <strong class="text-dark">${formatCurrency(c.liquido)}</strong>
-            </div>
-            <div class="text-nowrap text-muted" style="font-size: 0.65rem;">
-              Taxas: ${formatCurrency((c.valorTaxaPercentual || 0) + (c.taxaFixa || 0))}
-            </div>
-          </div>
+          <!-- Linha Inferior: Badges Delicados (Maior Margem e Ativo) -->
+          ${badgesBottomHtml}
         </div>
       `;
       multiCards.appendChild(col);
