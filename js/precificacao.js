@@ -1741,19 +1741,19 @@ function atualizarResultado(faixaForcada) {
       
       if (lucroFinal <= 0) {
         resLucroBox.classList.add("sa-lucro-box-danger");
-        if (statusBadge) statusBadge.innerHTML = `<span class="badge bg-danger text-white d-inline-flex align-items-center gap-1"><i class="bi bi-exclamation-octagon-fill"></i> Prejuízo (${margemLiquida.toFixed(1)}%)</span>`;
+        if (statusBadge) statusBadge.innerHTML = `<span class="badge d-inline-flex align-items-center gap-1" style="background-color: #dc3545; color: #ffffff; font-size: 0.72rem;"><i class="bi bi-exclamation-octagon-fill"></i> Prejuízo (${margemLiquida.toFixed(1)}%)</span>`;
       } else if (margemLiquida < 10) {
         resLucroBox.classList.add("sa-lucro-box-danger-subtle");
-        if (statusBadge) statusBadge.innerHTML = `<span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 d-inline-flex align-items-center gap-1"><i class="bi bi-exclamation-triangle-fill"></i> Margem Crítica (${margemLiquida.toFixed(1)}%)</span>`;
+        if (statusBadge) statusBadge.innerHTML = `<span class="badge d-inline-flex align-items-center gap-1" style="background-color: #f8d7da; color: #842029; border: 1px solid #f5c2c7; font-size: 0.72rem;"><i class="bi bi-exclamation-triangle-fill text-danger"></i> Margem Crítica (${margemLiquida.toFixed(1)}%)</span>`;
       } else if (margemLiquida < 20) {
         resLucroBox.classList.add("sa-lucro-box-warning");
-        if (statusBadge) statusBadge.innerHTML = `<span class="badge bg-warning bg-opacity-25 text-warning-emphasis border border-warning border-opacity-50 d-inline-flex align-items-center gap-1"><i class="bi bi-exclamation-triangle-fill text-warning"></i> Margem Moderada (${margemLiquida.toFixed(1)}%)</span>`;
+        if (statusBadge) statusBadge.innerHTML = `<span class="badge d-inline-flex align-items-center gap-1" style="background-color: #fff3cd; color: #664d03; border: 1px solid #ffecb5; font-size: 0.72rem;"><i class="bi bi-exclamation-triangle-fill text-warning"></i> Margem Moderada (${margemLiquida.toFixed(1)}%)</span>`;
       } else if (margemLiquida < 30) {
         resLucroBox.classList.add("sa-lucro-box-good");
-        if (statusBadge) statusBadge.innerHTML = `<span class="badge bg-success bg-opacity-15 text-success border border-success border-opacity-25 d-inline-flex align-items-center gap-1"><i class="bi bi-check-circle-fill"></i> Margem Saudável (${margemLiquida.toFixed(1)}%)</span>`;
+        if (statusBadge) statusBadge.innerHTML = `<span class="badge d-inline-flex align-items-center gap-1" style="background-color: #d1e7dd; color: #0f5132; border: 1px solid #badbcc; font-size: 0.72rem;"><i class="bi bi-check-circle-fill text-success"></i> Margem Saudável (${margemLiquida.toFixed(1)}%)</span>`;
       } else {
         resLucroBox.classList.add("sa-lucro-box-excellent");
-        if (statusBadge) statusBadge.innerHTML = `<span class="badge bg-success text-white d-inline-flex align-items-center gap-1 shadow-xs"><i class="bi bi-shield-check"></i> Margem Excelente (${margemLiquida.toFixed(1)}%)</span>`;
+        if (statusBadge) statusBadge.innerHTML = `<span class="badge d-inline-flex align-items-center gap-1" style="background-color: #198754; color: #ffffff; font-size: 0.72rem;"><i class="bi bi-shield-check"></i> Margem Excelente (${margemLiquida.toFixed(1)}%)</span>`;
       }
     } else if (statusWrapper) {
       statusWrapper.classList.add("d-none");
