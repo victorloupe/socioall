@@ -2383,10 +2383,18 @@ label i.bi {
 
 /* Card Compacto Multicanal */
 .sa-mini-channel-card {
+  border: 1px solid #E2E8F0 !important;
+  border-radius: 8px !important;
+  background: #FFFFFF !important;
   transition: all 0.15s ease-in-out;
 }
 .sa-mini-channel-card:hover {
-  transform: translateY(-1.5px);
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.06) !important;
+}
+.sa-mini-channel-card.active-channel {
+  border-color: #3B82F6 !important;
+  background: #F0F7FF !important;
+  box-shadow: 0 0 0 1.5px rgba(59, 130, 246, 0.3), 0 2px 5px rgba(59, 130, 246, 0.06) !important;
 }
 
