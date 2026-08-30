@@ -285,6 +285,14 @@ async function initPrecificacao() {
   currentSocioId = ctx.socioId;
   loadConfigPadroes();
 
+  // Inicializa os campos com os valores padrão globais
+  const inputInitEmb = document.getElementById("calcCustoEmbalagem");
+  if (inputInitEmb) inputInitEmb.value = (Number(configCalcAtual.embalagem_padrao) || 0.50).toFixed(2);
+  const inputInitOp = document.getElementById("calcCustoOperacional");
+  if (inputInitOp) inputInitOp.value = (Number(configCalcAtual.custo_operacional_padrao) || 0.00).toFixed(2);
+  const inputInitLucro = document.getElementById("calcLucro");
+  if (inputInitLucro) inputInitLucro.value = configCalcAtual.lucro_padrao ?? 30;
+
   document.getElementById("filtroHistoricoLoja")?.addEventListener("change", () => {
     // O filtro de loja é aplicado na tela (client-side): o cache completo
     // continua intacto para as sugestões e o aviso de produto duplicado.
@@ -620,17 +628,29 @@ async function initPrecificacao() {
     const modal = bootstrap.Modal.getInstance(modalEl);
     if (modal) modal.hide();
 
-    // Se estiver em modo manual ou loja sem padrões específicos, atualiza os campos
+    // Se estiver em modo manual ou loja sem padrões específicos (> 0), atualiza os campos na calculadora
     const lojaAtiva = lojasCache.find(l => l.id === selectedLojaId);
-    if (!lojaAtiva || (lojaAtiva.embalagem_padrao === undefined || lojaAtiva.embalagem_padrao === null)) {
-      const inputEmb = document.getElementById("calcCustoEmbalagem");
-      if (inputEmb) inputEmb.value = emb.toFixed(2);
+    const lojaTemEmbPropria = lojaAtiva && Number(lojaAtiva.embalagem_padrao) > 0;
+    const lojaTemOpProprio = lojaAtiva && Number(lojaAtiva.custo_operacional_padrao) > 0;
+
+    const inputEmb = document.getElementById("calcCustoEmbalagem");
+    if (inputEmb && !lojaTemEmbPropria) {
+      inputEmb.value = emb.toFixed(2);
+      triggerHighlightInputs([inputEmb]);
     }
-    if (!lojaAtiva || (lojaAtiva.custo_operacional_padrao === undefined || lojaAtiva.custo_operacional_padrao === null)) {
-      const inputOp = document.getElementById("calcCustoOperacional");
-      if (inputOp) inputOp.value = op.toFixed(2);
+    const inputOp = document.getElementById("calcCustoOperacional");
+    if (inputOp && !lojaTemOpProprio) {
+      inputOp.value = op.toFixed(2);
+      triggerHighlightInputs([inputOp]);
     }
+    const inputLucro = document.getElementById("calcLucro");
+    if (inputLucro) {
+      inputLucro.value = lucro;
+      triggerHighlightInputs([inputLucro]);
+    }
+
     checarPadroesLojaRestaurar();
+    renderLojasTable();
     atualizarResultado();
   });
 
@@ -645,7 +665,8 @@ async function initPrecificacao() {
   // Botões de restauração do padrão da loja ou global
   document.getElementById("btnRestoreEmbalagem")?.addEventListener("click", () => {
     const loja = lojasCache.find(l => l.id === selectedLojaId);
-    const padrao = Number(loja?.embalagem_padrao ?? configCalcAtual.embalagem_padrao ?? 0.50);
+    const lojaEmb = loja && Number(loja.embalagem_padrao) > 0 ? Number(loja.embalagem_padrao) : 0;
+    const padrao = lojaEmb > 0 ? lojaEmb : Number(configCalcAtual.embalagem_padrao ?? 0.50);
     const input = document.getElementById("calcCustoEmbalagem");
     if (input) {
       input.value = padrao.toFixed(2);
@@ -658,7 +679,8 @@ async function initPrecificacao() {
 
   document.getElementById("btnRestoreOperacional")?.addEventListener("click", () => {
     const loja = lojasCache.find(l => l.id === selectedLojaId);
-    const padrao = Number(loja?.custo_operacional_padrao ?? configCalcAtual.custo_operacional_padrao ?? 0.00);
+    const lojaOp = loja && Number(loja.custo_operacional_padrao) > 0 ? Number(loja.custo_operacional_padrao) : 0;
+    const padrao = lojaOp > 0 ? lojaOp : Number(configCalcAtual.custo_operacional_padrao ?? 0.00);
     const input = document.getElementById("calcCustoOperacional");
     if (input) {
       input.value = padrao.toFixed(2);
@@ -991,7 +1013,7 @@ const LOJAS_PADRAO_RECOMENDADAS = [
     nome: "Shopee",
     taxa_percentual: 20,
     taxa_fixa: 4,
-    embalagem_padrao: 0.50,
+    embalagem_padrao: 0,
     custo_operacional_padrao: 0,
     observacoes: "Taxa com Programa de Frete Grátis Extra: até R$79,99 = 20%+R$4; R$80–99,99 = 14%+R$16; R$100–199,99 = 14%+R$20; acima de R$200 = 14%+R$26."
   },
@@ -999,7 +1021,7 @@ const LOJAS_PADRAO_RECOMENDADAS = [
     nome: "Mercado Livre",
     taxa_percentual: 12,
     taxa_fixa: 6,
-    embalagem_padrao: 0.50,
+    embalagem_padrao: 0,
     custo_operacional_padrao: 0,
     observacoes: "Utilidades Domésticas: Clássico (12%+R$6 até R$78,99; 12%+R$0 a partir de R$79). Premium (16,5%+R$6 até R$78,99; 16,5%+R$0 a partir de R$79)."
   },
@@ -1007,7 +1029,7 @@ const LOJAS_PADRAO_RECOMENDADAS = [
     nome: "Amazon",
     taxa_percentual: 15,
     taxa_fixa: 0,
-    embalagem_padrao: 0.50,
+    embalagem_padrao: 0,
     custo_operacional_padrao: 0,
     observacoes: "Comissão de Casa e Cozinha (utilidades domésticas): 15%, caindo para 8% em itens de até R$ 29,99. Plano Profissional: R$0 fixa."
   },
@@ -1015,7 +1037,7 @@ const LOJAS_PADRAO_RECOMENDADAS = [
     nome: "TikTok Shop",
     taxa_percentual: 12,
     taxa_fixa: 6,
-    embalagem_padrao: 0.50,
+    embalagem_padrao: 0,
     custo_operacional_padrao: 0,
     observacoes: "Taxa por faixa de preço (vendedor CNPJ): até R$49,99 = 10%+R$4,00 (ou 16% frete grátis); a partir de R$50,00 = 12%+R$6,00."
   }
@@ -1026,7 +1048,7 @@ const PRESETS_LOJAS_FORM = {
     nome: "Shopee",
     taxa_percentual: 20,
     taxa_fixa: 4,
-    embalagem_padrao: 0.50,
+    embalagem_padrao: 0,
     custo_operacional_padrao: 0,
     observacoes: "Taxa com Programa de Frete Grátis Extra: até R$79,99 = 20%+R$4; R$80–99,99 = 14%+R$16; R$100–199,99 = 14%+R$20; acima de R$200 = 14%+R$26."
   },
@@ -1034,7 +1056,7 @@ const PRESETS_LOJAS_FORM = {
     nome: "Mercado Livre",
     taxa_percentual: 12,
     taxa_fixa: 6,
-    embalagem_padrao: 0.50,
+    embalagem_padrao: 0,
     custo_operacional_padrao: 0,
     observacoes: "Anúncio Clássico (12%+R$6 até R$78,99; 12%+R$0 a partir de R$79). Categoria Casa e Utilidades."
   },
@@ -1042,7 +1064,7 @@ const PRESETS_LOJAS_FORM = {
     nome: "Mercado Livre",
     taxa_percentual: 16.5,
     taxa_fixa: 6,
-    embalagem_padrao: 0.50,
+    embalagem_padrao: 0,
     custo_operacional_padrao: 0,
     observacoes: "Anúncio Premium (16,5%+R$6 até R$78,99; 16,5%+R$0 a partir de R$79). Inclui parcelamento sem juros."
   },
@@ -1050,7 +1072,7 @@ const PRESETS_LOJAS_FORM = {
     nome: "Amazon",
     taxa_percentual: 15,
     taxa_fixa: 0,
-    embalagem_padrao: 0.50,
+    embalagem_padrao: 0,
     custo_operacional_padrao: 0,
     observacoes: "Comissão de Casa e Cozinha (utilidades domésticas): 15%, caindo para 8% em itens de até R$ 29,99. Plano Profissional: R$0 fixa."
   },
@@ -1058,7 +1080,7 @@ const PRESETS_LOJAS_FORM = {
     nome: "TikTok Shop",
     taxa_percentual: 12,
     taxa_fixa: 6,
-    embalagem_padrao: 0.50,
+    embalagem_padrao: 0,
     custo_operacional_padrao: 0,
     observacoes: "Taxa por faixa de preço (vendedor CNPJ): até R$49,99 = 10%+R$4,00 (ou 16% frete grátis); a partir de R$50,00 = 12%+R$6,00."
   }
@@ -1207,8 +1229,12 @@ function checarPadroesLojaRestaurar() {
   const textEmb = document.getElementById("restoreEmbalagemValorText");
   const textOp = document.getElementById("restoreOperacionalValorText");
 
-  const padraoEmb = Number(loja?.embalagem_padrao ?? configCalcAtual.embalagem_padrao ?? 0.50);
-  const padraoOp = Number(loja?.custo_operacional_padrao ?? configCalcAtual.custo_operacional_padrao ?? 0.00);
+  const lojaEmb = loja && Number(loja.embalagem_padrao) > 0 ? Number(loja.embalagem_padrao) : 0;
+  const padraoEmb = lojaEmb > 0 ? lojaEmb : Number(configCalcAtual.embalagem_padrao ?? 0.50);
+
+  const lojaOp = loja && Number(loja.custo_operacional_padrao) > 0 ? Number(loja.custo_operacional_padrao) : 0;
+  const padraoOp = lojaOp > 0 ? lojaOp : Number(configCalcAtual.custo_operacional_padrao ?? 0.00);
+
   const atualEmb = Number(inputEmb?.value ?? 0);
   const atualOp = Number(inputOp?.value ?? 0);
 
@@ -1252,18 +1278,18 @@ function aplicarTaxaDaLojaSelecionada() {
 
   const inputsToHighlight = [];
 
-  const embVal = (loja && loja.embalagem_padrao !== undefined && loja.embalagem_padrao !== null)
-    ? Number(loja.embalagem_padrao)
-    : Number(configCalcAtual.embalagem_padrao ?? 0.50);
+  // Embalagem: se a loja tiver um valor específico customizado (> 0), usa ele; senão usa o padrão global
+  const lojaEmb = loja && Number(loja.embalagem_padrao) > 0 ? Number(loja.embalagem_padrao) : 0;
+  const embVal = lojaEmb > 0 ? lojaEmb : Number(configCalcAtual.embalagem_padrao ?? 0.50);
   const inputEmb = document.getElementById("calcCustoEmbalagem");
   if (inputEmb) {
     inputEmb.value = embVal.toFixed(2);
     inputsToHighlight.push(inputEmb);
   }
 
-  const opVal = (loja && loja.custo_operacional_padrao !== undefined && loja.custo_operacional_padrao !== null)
-    ? Number(loja.custo_operacional_padrao)
-    : Number(configCalcAtual.custo_operacional_padrao ?? 0.00);
+  // Custo operacional: se a loja tiver um valor específico customizado (> 0), usa ele; senão usa o padrão global
+  const lojaOp = loja && Number(loja.custo_operacional_padrao) > 0 ? Number(loja.custo_operacional_padrao) : 0;
+  const opVal = lojaOp > 0 ? lojaOp : Number(configCalcAtual.custo_operacional_padrao ?? 0.00);
   const inputOp = document.getElementById("calcCustoOperacional");
   if (inputOp) {
     inputOp.value = opVal.toFixed(2);
@@ -1349,6 +1375,11 @@ function renderLojasTable() {
       ? `<a href="${escapeHtml(l.link_referencia)}" target="_blank" rel="noopener noreferrer" class="text-decoration-none text-muted small ms-1" title="Ver taxas oficiais"><i class="bi bi-box-arrow-up-right"></i></a>` 
       : "";
 
+    const temEmbPropria = Number(l.embalagem_padrao) > 0;
+    const temOpProprio = Number(l.custo_operacional_padrao) > 0;
+    const embTexto = temEmbPropria ? formatCurrency(l.embalagem_padrao) : `Global (${formatCurrency(configCalcAtual.embalagem_padrao ?? 0.50)})`;
+    const opTexto = temOpProprio ? formatCurrency(l.custo_operacional_padrao) : `Global (${formatCurrency(configCalcAtual.custo_operacional_padrao ?? 0.00)})`;
+
     tr.innerHTML = `
       <td data-label="Loja">
         <div class="d-flex align-items-center">
@@ -1364,11 +1395,11 @@ function renderLojasTable() {
       </td>
       <td data-label="Custos padrão">
         <div class="d-flex flex-wrap gap-1">
-          <span class="badge bg-light text-dark border fw-normal" style="font-size: 0.7rem;">
-            <span class="text-muted">Emb:</span> <strong>${formatCurrency(l.embalagem_padrao || 0)}</strong>
+          <span class="badge bg-light text-dark border fw-normal" style="font-size: 0.7rem;" title="${temEmbPropria ? 'Custo específico desta loja' : 'Herdando padrão global'}">
+            <span class="text-muted">Emb:</span> <strong>${embTexto}</strong>
           </span>
-          <span class="badge bg-light text-dark border fw-normal" style="font-size: 0.7rem;">
-            <span class="text-muted">Op:</span> <strong>${formatCurrency(l.custo_operacional_padrao || 0)}</strong>
+          <span class="badge bg-light text-dark border fw-normal" style="font-size: 0.7rem;" title="${temOpProprio ? 'Custo específico desta loja' : 'Herdando padrão global'}">
+            <span class="text-muted">Op:</span> <strong>${opTexto}</strong>
           </span>
         </div>
       </td>
